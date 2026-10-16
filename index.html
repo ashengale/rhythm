@@ -192,16 +192,6 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .np-ctrl svg{width:16px;height:16px;fill:var(--c-ink)}
 .np-ctrl .main svg{fill:var(--c-paper)}
 
-.spec-hero{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid var(--c-ink);padding-bottom:10px}
-.spec-hero b{font-family:var(--f-disp);font-size:34px;line-height:.9;letter-spacing:-.02em}
-.spec-hero span{font-size:10px;letter-spacing:.2em;font-weight:700;text-align:right}
-.spec{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
-.spec div{border-top:1px solid var(--c-ink);padding-top:6px}
-.spec small{display:block;font-size:9px;letter-spacing:.2em;color:var(--c-ink-2);font-weight:700}
-.spec p{font-size:13px;font-weight:700;margin-top:3px}
-.howto{display:flex;flex-direction:column;gap:6px;font-family:var(--f-kr);font-size:12px}
-.howto li{list-style:none;display:flex;gap:10px;align-items:center}
-.howto li b{font-family:var(--f-mono);font-size:10px;width:22px;height:22px;display:grid;place-items:center;border:1.5px solid var(--c-ink);border-radius:5px;flex:none}
 
 .notice{display:flex;gap:14px;align-items:center}
 .notice .big{flex:none;width:58px;height:58px;border-radius:12px;background:var(--c-ink);color:var(--c-paper);display:grid;place-items:center;font-family:var(--f-disp);font-size:30px;font-weight:900}
@@ -839,7 +829,7 @@ function toTex(c){
 }
 const ICONS = {   // 18×18 viewBox
   play:'M5 3l11 6-11 6z', pause:'M4 3h4v12H4zM10 3h4v12h-4z', stop:'M4 4h10v10H4z', eject:'M9 3l6 7H3zM3 12h12v3H3z',
-  info:'M9 2a7 7 0 1 1 0 14A7 7 0 0 1 9 2zm0 2a5 5 0 1 0 0 10A5 5 0 0 0 9 4zM8 8h2v4.4H8zM8 5.2h2v2H8z',
+  list:'M2 3.5h2.4v2.4H2zM6 3.8h10v1.8H6zM2 7.8h2.4v2.4H2zM6 8.1h10v1.8H6zM2 12.1h2.4v2.4H2zM6 12.4h10v1.8H6z',
 };
 
 /* =========================================================
@@ -939,7 +929,7 @@ const POCK = { w:106, h:69, y:30 };
 const HINGE_Y = POCK.y - POCK.h / 2;                    // 도어 힌지 (포켓 아래)
 const LCDU = { w:82, h:24, x:-29, y:-24 };
 const SPK = { x:47, y:-24, r:13 };
-const BTN_ACTS = ['play','stop','eject','info'];
+const BTN_ACTS = ['play','stop','eject','list'];
 
 function stripTexture(){
   const { c, g } = makeCanvas(132, 7, 12);
@@ -1208,7 +1198,7 @@ function pressBtn(act){
   if (act === 'play') play();
   if (act === 'stop'){ if (!loaded) openPop('notape'); else stop(); }
   if (act === 'eject') eject();
-  if (act === 'info') openPop('info');
+  if (act === 'list') togglePlaylist();
 }
 const sndBtn = $('#snd');
 function toggleSound(){
@@ -1254,25 +1244,6 @@ function popHTML(kind){
       <div class="np-ctrl"><button data-np-act="prev" aria-label="previous">${svgI(PREV)}</button><button class="main" data-np-act="toggle" aria-label="play/pause"><svg viewBox="0 0 18 18"><path data-np="ico" d="${playing ? ICONS.pause : ICONS.play}"/></svg></button><button data-np-act="next" aria-label="next">${svgI(NEXT)}</button></div>
     </div>`;
   }
-  if (kind === 'info'){
-    return `<div class="pop-head"><span>i DECK SPEC</span><span class="grip"></span><button class="pop-x" aria-label="close">${X_ICO}</button></div>
-    <div class="pop-body">
-      <div class="spec-hero"><b>HT-01</b><span>ANALOG<br>CASSETTE DECK</span></div>
-      <div class="spec">
-        <div><small>TAPE TYPE</small><p>TYPE I · NORMAL</p></div>
-        <div><small>FREQ RESPONSE</small><p>30 Hz – 16 kHz</p></div>
-        <div><small>WOW &amp; FLUTTER</small><p>0.08 % WRMS</p></div>
-        <div><small>MOTOR</small><p>DC SERVO</p></div>
-      </div>
-      <ul class="howto">
-        <li><b>01</b>테이프를 탭하거나 플레이어로 끌어다 놓기</li>
-        <li><b>02</b>넣으면 자동 재생 · ▶ 버튼이나 장착된 테이프 탭으로 재생/정지</li>
-        <li><b>03</b>⏏ 버튼 또는 플레이어 밖으로 끌어내면 배출</li>
-        <li><b>04</b>상단 노브를 누르면 사운드 ON/OFF</li>
-        <li><b>05</b>하단 VOL 슬라이더 또는 ↑ ↓ 키로 볼륨 조절</li>
-      </ul>
-    </div>`;
-  }
   return `<div class="pop-head"><span>! NOTICE</span><span class="grip"></span><button class="pop-x" aria-label="close">${X_ICO}</button></div>
     <div class="pop-body">
       <div class="notice"><div class="big">!</div><p>테이프가 없습니다.<br>먼저 테이프를 넣어 주세요.<small>NO TAPE IN DECK</small></p></div>
@@ -1310,6 +1281,9 @@ function openPop(kind){
     }
   });
   npSig = '';
+}
+function togglePlaylist(){                                                 // LIST 버튼 : 플레이리스트 열기/닫기
+  if (popKind === 'now') closePop(); else openPop('now');
 }
 function closePop(){
   if (!popKind) return;
@@ -1427,10 +1401,11 @@ window.addEventListener('keydown', e => {
   if (e.key === 'ArrowUp' || e.key === 'ArrowRight' || e.key === '+' || e.key === '='){ e.preventDefault(); setVolume(+volEl.value + 5); return; }
   if (e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === '-'){ e.preventDefault(); setVolume(+volEl.value - 5); return; }
   if (['1','2','3','4'].includes(e.key)) unlockAudio(tapes[+e.key - 1]);
-  else if (e.code === 'Space' || e.key === 'e' || e.key === 'E') unlockAudio();
+  else if (e.code === 'Space' || e.key === 'e' || e.key === 'E' || e.key === 'l' || e.key === 'L') unlockAudio();
   if (e.code === 'Space'){ e.preventDefault(); pressBtn('play'); }
   if (e.key === 'Escape') closePop();
   if (e.key === 'e' || e.key === 'E') pressBtn('eject');
+  if (e.key === 'l' || e.key === 'L') pressBtn('list');
   if (['1','2','3','4'].includes(e.key)) insert(tapes[+e.key - 1]);
 });
 
