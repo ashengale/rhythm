@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>HALF/TONE Cassette Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600&family=JetBrains+Mono:wght@400;500;700;800&family=Unbounded:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   COLOR TOKENS — 여기서 색상만 바꾸면 UI + 3D 전체에 반영됩니다
+   ========================================================= */
+:root{
+  --c-paper:   #fafafa;   /* 포인트 컬러 1 : 밝은 그레이 */
+  --c-paper-2: #f1f1f1;   /* 밝은 그레이 (한 톤 아래) */
+  --c-paper-3: #e6e6e6;   /* 밝은 그레이 (두 톤 아래) */
+  --c-ink:     #222222;   /* 포인트 컬러 2 : 블랙 */
+  --c-ink-2:   #4d4d4d;   /* 보조 텍스트 */
+  --c-ink-3:   #8c8c8c;   /* 비활성 */
+  --c-bg:      transparent;                                            /* 페이지 배경 (투명) */
+  --c-line:    color-mix(in srgb, var(--c-ink) 16%, transparent);      /* 얇은 구분선 */
+  --c-grid:    color-mix(in srgb, var(--c-ink) 6%,  transparent);      /* 그리드 라인 */
+
+  /* 3D 하프톤 톤 (밝을수록 점이 작아짐) */
+  --c-band-a:  #d0d0d0;   /* 테이프 A 라벨 밴드 */
+  --c-band-b:  #a9a9a9;   /* 테이프 B 라벨 밴드 */
+  --c-band-c:  #bdbdbd;   /* 테이프 C 라벨 밴드 */
+  --c-band-d:  #b4b4b4;   /* 테이프 D 라벨 밴드 */
+  --c-pocket:  #dcdcdc;   /* 플레이어 카세트 포켓 바닥 */
+
+  --f-disp: 'Unbounded', 'Arial Black', sans-serif;
+  --f-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  --f-kr:   'IBM Plex Sans KR', 'Apple SD Gothic Neo', sans-serif;
+
+  --gutter: clamp(14px, 2.2vw, 34px);
+
+  /* 배경 */
+  --c-mark:    color-mix(in srgb, var(--c-ink) 55%, transparent);   /* 재단 마크 */
+  --dot-alpha: .13;       /* 하프톤 점 진하기 (0 ~ 1) */
+  --dot-cell:  11;        /* 하프톤 점 간격 (px) */
+  --speed:     1;         /* 배경 움직임 속도 배율 (0 = 정지) */
+  --edge: 8px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--c-paper);overflow:hidden;overscroll-behavior:none}
+body{
+  color:var(--c-ink);font-family:var(--f-mono);
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;
+  user-select:none;-webkit-user-select:none;touch-action:none;
+}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+
+/* 고정 높이 : svh → 모바일 브라우저 상·하단 바 출몰에 따라 리사이즈되지 않음 */
+.app{
+  position:fixed;left:0;top:0;width:100%;
+  height:100vh;height:100svh;
+  display:flex;flex-direction:column;
+  padding:var(--gutter);
+  padding-top:max(var(--gutter), env(safe-area-inset-top));
+  z-index:1;
+}
+
+/* ---------- HEADER ---------- */
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;
+  padding-bottom:14px;border-bottom:2px solid var(--c-ink)}
+.wordmark{font-family:var(--f-disp);font-weight:900;font-size:clamp(34px,5.6vw,92px);
+  line-height:.84;letter-spacing:-.035em;white-space:nowrap}
+.wordmark .sl{color:transparent;-webkit-text-stroke:2px var(--c-ink);padding:0 .03em}
+.sub{display:flex;align-items:center;white-space:nowrap;gap:14px;margin-top:12px;font-size:11px;letter-spacing:.32em;font-weight:700}
+.sub .kr{font-family:var(--f-kr);font-weight:400;letter-spacing:.12em;color:var(--c-ink-2)}
+.sub i{width:26px;height:2px;background:var(--c-ink)}
+.meta{display:flex;flex-direction:column;align-items:flex-end;gap:6px;font-size:10px;letter-spacing:.2em;font-weight:700}
+.meta .chev{display:flex;gap:3px}
+.meta .chev b{width:8px;height:12px;background:var(--c-ink);clip-path:polygon(0 0,45% 0,100% 50%,45% 100%,0 100%,55% 50%)}
+.meta #clock{color:var(--c-ink-2);font-weight:500}
+
+/* ---------- MAIN GRID ---------- */
+.grid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(320px,.85fr) 1.45fr;
+  gap:var(--gutter);padding:var(--gutter) 0}
+
+/* 3D 영역 공통 (플레이어 슬롯 / 테이프 스테이지) */
+.zone{position:relative;min-height:0}
+.zone::before,.zone::after{content:"";position:absolute;width:16px;height:16px;border:2px solid var(--c-ink);pointer-events:none}
+.zone::before{left:0;top:0;border-right:0;border-bottom:0}
+.zone::after{right:0;bottom:0;border-left:0;border-top:0}
+.zone-label{position:absolute;left:26px;top:4px;font-size:10px;letter-spacing:.24em;font-weight:800;display:flex;gap:10px;align-items:center}
+.zone-label em{font-style:normal;font-family:var(--f-disp);font-size:22px;letter-spacing:0}
+.zone-hint{position:absolute;right:26px;bottom:2px;font-size:10px;letter-spacing:.24em;font-weight:700;color:var(--c-ink-2);display:flex;gap:8px;align-items:center}
+.zone-hint .k{font-family:var(--f-kr);letter-spacing:.06em;font-weight:400}
+
+.player{background:radial-gradient(circle,var(--c-grid) 1px,transparent 1.5px) 0 0/14px 14px}
+.stage{background-image:linear-gradient(var(--c-grid) 1px,transparent 1px),linear-gradient(90deg,var(--c-grid) 1px,transparent 1px);
+  background-size:calc(100% / 8) calc(100% / 6)}
+.ht-disc{position:absolute;right:4%;top:10%;width:min(52%,62vh);aspect-ratio:1;border-radius:50%;
+  background-image:radial-gradient(circle,var(--c-ink) 32%,transparent 36%);background-size:9px 9px;
+  -webkit-mask:radial-gradient(circle at 30% 30%,transparent 18%,#000 78%);mask:radial-gradient(circle at 30% 30%,transparent 18%,#000 78%);
+  opacity:.12;pointer-events:none}
+.anchor{position:absolute;width:2px;height:2px;pointer-events:none}
+.anchor[data-i="0"]{left:31%;top:24%}
+.anchor[data-i="1"]{left:69%;top:38%}
+.anchor[data-i="2"]{left:31%;top:64%}
+.anchor[data-i="3"]{left:69%;top:79%}
+
+.tag{position:absolute;display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:.18em;transition:opacity .3s}
+.tag b{font-weight:800;display:block}
+.tag small{display:block;margin-top:3px;font-size:9px;color:var(--c-ink-2);letter-spacing:.14em}
+.tag-node{width:10px;height:10px;flex:none;border:1.5px solid var(--c-ink);background:var(--c-paper);transition:background .2s}
+.tag.hot .tag-node,.tag.loaded .tag-node{background:var(--c-ink)}
+.tag.loaded small::after{content:" · IN DECK";color:var(--c-ink);font-weight:800}
+.tag[data-i="0"]{right:0;top:9%}
+.tag[data-i="1"]{right:0;top:57%}
+.tag[data-i="2"]{left:0;top:44%;flex-direction:row-reverse;text-align:right}
+.tag[data-i="3"]{right:0;top:83%}
+
+/* ---------- FOOTER ---------- */
+.bottom{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  border-top:2px solid var(--c-ink);padding-top:10px;font-size:10px;letter-spacing:.2em;font-weight:700}
+.steps{display:flex;gap:16px;color:var(--c-ink-2)}
+.steps span b{color:var(--c-ink)}
+.snd{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:.2em;font-weight:800}
+.snd i{width:26px;height:14px;border:1.5px solid var(--c-ink);border-radius:8px;position:relative}
+.snd i::after{content:"";position:absolute;top:2px;left:2px;width:7px;height:7px;border-radius:50%;background:var(--c-ink);transition:transform .2s}
+.snd.on i::after{transform:translateX(12px)}
+
+/* ---------- 3D CANVAS & OVERLAYS ---------- */
+#gl{position:fixed;left:0;top:0;width:100vw;height:100vh;height:100svh;z-index:10;pointer-events:none}
+#lines{position:fixed;left:0;top:0;width:100vw;height:100vh;height:100svh;z-index:14;pointer-events:none;overflow:visible}
+#lines line{stroke:var(--c-ink);stroke-width:1}
+#lines rect{fill:var(--c-paper);stroke:var(--c-ink);stroke-width:1.5}
+#lines g{transition:opacity .35s}
+
+/* ---------- POPUP ---------- */
+.pop-layer{position:fixed;inset:0;z-index:50;display:none}
+.pop-layer.open{display:block}
+.pop-back{position:absolute;inset:0;
+  background-image:radial-gradient(circle,color-mix(in srgb,var(--c-ink) 22%,transparent) 1px,transparent 1.6px);
+  background-size:6px 6px;animation:fade .25s ease both}
+.pop{position:absolute;left:0;top:0;width:min(400px,calc(100vw - 24px));
+  max-height:calc(100vh - 24px);max-height:calc(100svh - 24px);display:flex;flex-direction:column;
+  background:var(--c-paper);border:2px solid var(--c-ink);border-radius:14px;box-shadow:8px 8px 0 var(--c-ink);
+  animation:popin .32s cubic-bezier(.2,1.3,.4,1) both}
+.pop-layer.closing .pop{animation:popout .18s ease-in both}
+.pop-layer.closing .pop-back{animation:fade .18s reverse both}
+@keyframes popin{from{opacity:0;transform:translateY(14px) scale(.96)}}
+@keyframes popout{to{opacity:0;transform:translateY(10px) scale(.97)}}
+@keyframes fade{from{opacity:0}}
+.pop-head{display:flex;align-items:center;gap:10px;padding:10px 10px 10px 14px;border-bottom:2px solid var(--c-ink);
+  font-size:10px;letter-spacing:.24em;font-weight:800;cursor:grab;touch-action:none}
+.pop-head:active{cursor:grabbing}
+.pop-head .grip{flex:1;height:8px;background:repeating-linear-gradient(90deg,var(--c-ink) 0 2px,transparent 2px 5px);opacity:.25}
+.pop-x{width:28px;height:28px;border:2px solid var(--c-ink);border-radius:7px;display:grid;place-items:center;flex:none}
+.pop-x svg{width:12px;height:12px;stroke:var(--c-ink);stroke-width:2.4}
+.pop-x:active{background:var(--c-ink)}.pop-x:active svg{stroke:var(--c-paper)}
+.pop-body{padding:16px;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;display:flex;flex-direction:column;gap:14px}
+
+.np-top{display:flex;gap:14px;align-items:center}
+.np-reels{flex:none;display:flex;gap:8px;padding:10px 12px;background:var(--c-ink);border-radius:10px}
+.np-reels i{width:30px;height:30px;border-radius:50%;border:2px dashed var(--c-paper);display:grid;place-items:center}
+.np-reels i::after{content:"";width:9px;height:9px;border-radius:50%;background:var(--c-paper)}
+.np-reels.spin i{animation:spin 1.6s linear infinite}
+@keyframes spin{to{transform:rotate(-360deg)}}
+.np-info{min-width:0}
+.np-letter{font-size:10px;letter-spacing:.24em;font-weight:800;color:var(--c-ink-2)}
+.np-name{font-family:var(--f-disp);font-weight:700;font-size:20px;line-height:1.1;margin:4px 0;letter-spacing:-.01em}
+.np-time{font-size:11px;letter-spacing:.12em}
+.np-bar{height:4px;background:var(--c-paper-3);position:relative;cursor:pointer}
+.np-bar i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--c-ink)}
+.np-list{list-style:none;display:flex;flex-direction:column;border-top:1px solid var(--c-line)}
+.np-list li{display:flex;gap:12px;align-items:center;padding:10px 6px;border-bottom:1px solid var(--c-line);font-size:12px;cursor:pointer;transition:background .15s}
+.np-list li span{font-size:10px;color:var(--c-ink-3);font-weight:700}
+.np-list li b{flex:1;font-weight:700;letter-spacing:.02em}
+.np-list li em{font-style:normal;font-size:10px;color:var(--c-ink-3)}
+.np-list li.on{background:var(--c-ink);color:var(--c-paper)}
+.np-list li.on span,.np-list li.on em{color:var(--c-paper)}
+.np-ctrl{display:flex;justify-content:center;gap:10px}
+.np-ctrl button{width:48px;height:42px;border:2px solid var(--c-ink);border-radius:9px;display:grid;place-items:center;box-shadow:0 3px 0 var(--c-ink)}
+.np-ctrl button:active{transform:translateY(3px);box-shadow:none}
+.np-ctrl button.main{width:64px;background:var(--c-ink)}
+.np-ctrl svg{width:16px;height:16px;fill:var(--c-ink)}
+.np-ctrl .main svg{fill:var(--c-paper)}
+
+.spec-hero{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid var(--c-ink);padding-bottom:10px}
+.spec-hero b{font-family:var(--f-disp);font-size:34px;line-height:.9;letter-spacing:-.02em}
+.spec-hero span{font-size:10px;letter-spacing:.2em;font-weight:700;text-align:right}
+.spec{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
+.spec div{border-top:1px solid var(--c-ink);padding-top:6px}
+.spec small{display:block;font-size:9px;letter-spacing:.2em;color:var(--c-ink-2);font-weight:700}
+.spec p{font-size:13px;font-weight:700;margin-top:3px}
+.howto{display:flex;flex-direction:column;gap:6px;font-family:var(--f-kr);font-size:12px}
+.howto li{list-style:none;display:flex;gap:10px;align-items:center}
+.howto li b{font-family:var(--f-mono);font-size:10px;width:22px;height:22px;display:grid;place-items:center;border:1.5px solid var(--c-ink);border-radius:5px;flex:none}
+
+.notice{display:flex;gap:14px;align-items:center}
+.notice .big{flex:none;width:58px;height:58px;border-radius:12px;background:var(--c-ink);color:var(--c-paper);display:grid;place-items:center;font-family:var(--f-disp);font-size:30px;font-weight:900}
+.notice p{font-family:var(--f-kr);font-size:14px;font-weight:600;line-height:1.45}
+.notice small{display:block;font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;color:var(--c-ink-2);margin-top:4px;font-weight:500}
+.pop-cta{align-self:stretch;height:44px;border:2px solid var(--c-ink);border-radius:10px;background:var(--c-ink);color:var(--c-paper);font-size:11px;letter-spacing:.24em;font-weight:800}
+
+.boot{position:fixed;inset:0;z-index:60;display:grid;place-items:center;font-size:10px;letter-spacing:.3em;font-weight:800;transition:opacity .4s}
+.boot.gone{opacity:0;pointer-events:none}
+
+/* =========================================================
+   BACKGROUND (하프톤 필드 · 그리드 · 워드마크 · 재단 마크 · 그레인)
+   ========================================================= */
+/* 고정 높이 : 모바일 브라우저 상·하단 바에 따라 리사이즈되지 않음 */
+.bg{position:fixed;left:0;top:0;z-index:0;pointer-events:none;width:100%;height:100vh;height:100svh;overflow:hidden;
+  background:radial-gradient(120% 90% at 50% 45%, var(--c-paper) 55%, var(--c-paper-2) 100%)}
+
+/* 1) 그리드 */
+.bg-grid{position:absolute;inset:0;
+  background-image:linear-gradient(var(--c-grid) 1px,transparent 1px),linear-gradient(90deg,var(--c-grid) 1px,transparent 1px);
+  background-size:calc(100% / 12) calc(100% / 8);background-position:-1px -1px}
+
+/* 2) 하프톤 캔버스 */
+#ht{position:absolute;inset:0;width:100%;height:100%}
+
+/* 3) 거대한 워드마크 (아주 옅게) */
+.mega{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;
+  font-family:var(--f-disp);font-weight:900;font-size:min(22vw,40vh);letter-spacing:-.05em;line-height:1;
+  color:transparent;-webkit-text-stroke:1px color-mix(in srgb,var(--c-ink) 10%,transparent);opacity:1}
+
+/* 4) 인쇄 재단 마크 */
+.mark{position:absolute;width:14px;height:14px}
+.mark::before,.mark::after{content:"";position:absolute;background:var(--c-mark)}
+.mark::before{width:100%;height:1px;top:50%}
+.mark::after{width:1px;height:100%;left:50%}
+.mark i{position:absolute;inset:3px;border:1px solid var(--c-mark);border-radius:50%}
+.mark.tl{left:var(--edge);top:var(--edge)} .mark.tr{right:var(--edge);top:var(--edge)}
+.mark.bl{left:var(--edge);bottom:var(--edge)} .mark.br{right:var(--edge);bottom:var(--edge)}
+
+
+/* 5) 종이 그레인 */
+.grain{position:absolute;inset:-50%;opacity:.05;pointer-events:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+@media (max-width:760px){
+  :root{--dot-cell:9}
+  .bg-grid{background-size:calc(100% / 6) calc(100% / 10)}
+  .mega{font-size:min(30vw,30vh)}
+}
+@media (prefers-reduced-motion: reduce){ :root{--speed:0} }
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width:1100px) and (min-width:761px){
+  .grid{grid-template-columns:minmax(300px,1fr) 1.2fr}
+}
+@media (max-width:760px){
+  :root{--gutter:14px}
+  .top{padding-bottom:10px}
+  .wordmark{font-size:clamp(30px,10vw,44px)}
+  .sub{gap:8px;margin-top:8px;font-size:9px;letter-spacing:.22em}
+  .sub i{display:none}
+  .meta{font-size:9px}
+  .meta #clock{display:none}
+  .grid{display:flex;flex-direction:column;gap:10px;padding:10px 0}
+  .player{flex:1}
+  .stage{flex:0 0 40%;background-size:calc(100% / 6) calc(100% / 4)}
+  .tag,#lines,.ht-disc{display:none}
+  .zone-label{left:22px;top:2px;font-size:9px}
+  .zone-label em{font-size:16px}
+  .zone-hint{right:22px;font-size:9px}
+  .zone-hint .en{display:none}
+  .anchor[data-i="0"]{left:27%;top:30%}
+  .anchor[data-i="1"]{left:73%;top:34%}
+  .anchor[data-i="2"]{left:27%;top:66%}
+  .anchor[data-i="3"]{left:73%;top:70%}
+  .steps,.bottom .copy{display:none}
+  .snd{margin-left:auto}
+  .bottom{padding-top:8px;font-size:9px}
+}
+@media (max-width:400px){ .sub .kr{display:none} }
+@media (max-height:540px) and (min-width:761px){
+  .tag,#lines,.zone-hint{display:none}
+  .top{padding-bottom:8px}
+  .wordmark{font-size:30px}
+  .sub{display:none}
+  .grid{padding:10px 0;gap:14px}
+  .bottom{display:none}
+}
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+
+<div class="bg" id="bg" aria-hidden="true">
+  <div class="bg-grid"></div>
+  <div class="mega">HALF/TONE</div>
+  <canvas id="ht"></canvas>
+  <div class="grain"></div>
+
+  <span class="mark tl"><i></i></span><span class="mark tr"><i></i></span>
+  <span class="mark bl"><i></i></span><span class="mark br"><i></i></span>
+</div>
+
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">
+      <h1 class="wordmark">HALF<span class="sl">/</span>TONE</h1>
+      <div class="sub"><span>ANALOG CASSETTE SYSTEM</span><i></i><span class="kr">하프톤 카세트 시스템</span></div>
+    </div>
+    <div class="meta">
+      <div class="chev"><b></b><b></b><b></b></div>
+      <span>//DECK_01</span>
+      <span id="clock">----.--.--</span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- 3D PLAYER 영역 (레이아웃 슬롯) -->
+    <section class="zone player" id="player" aria-label="cassette player">
+      <div class="zone-label">[ PLAYER ] <em>HT-01</em></div>
+      <div class="zone-hint"><span class="en">PRESS ▶</span><span class="k">버튼을 눌러 재생</span></div>
+    </section>
+
+    <!-- 3D TAPE STAGE -->
+    <section class="zone stage" id="stage">
+      <div class="ht-disc"></div>
+      <div class="zone-label">[ SELECT TAPE ] <em>04</em></div>
+      <div class="anchor" data-i="0"></div>
+      <div class="anchor" data-i="1"></div>
+      <div class="anchor" data-i="2"></div>
+      <div class="anchor" data-i="3"></div>
+      <div class="tag" data-i="0"><span class="tag-node"></span><span><b>TAPE_A</b><small>MORNING STATIC</small></span></div>
+      <div class="tag" data-i="1"><span class="tag-node"></span><span><b>TAPE_B</b><small>NIGHT GRAIN</small></span></div>
+      <div class="tag" data-i="2"><span class="tag-node"></span><span><b>TAPE_C</b><small>MONO RIVER</small></span></div>
+      <div class="tag" data-i="3"><span class="tag-node"></span><span><b>TAPE_D</b><small>SOFT CARBON</small></span></div>
+      <div class="zone-hint"><span class="en">DRAG / TAP</span><span class="k">탭하거나 끌어서 넣기</span></div>
+    </section>
+  </main>
+
+  <footer class="bottom">
+    <span class="copy">HALF/TONE LABS — 2026</span>
+    <div class="steps"><span><b>01</b> SELECT</span><span><b>02</b> INSERT</span><span><b>03</b> PLAY</span></div>
+    <button class="snd on" id="snd"><span id="sndTxt">SOUND ON</span><i></i></button>
+  </footer>
+</div>
+
+<canvas id="gl"></canvas>
+<svg id="lines"></svg>
+<div class="pop-layer" id="popLayer"></div>
+<div class="boot" id="boot">LOADING TAPE…</div>
+
+<script>
+/* =========================================================
+   HALFTONE FIELD — 45° 망점, 천천히 흘러가는 빛 덩어리
+   ========================================================= */
+(() => {
+  const cv = document.getElementById('ht'), g = cv.getContext('2d');
+  const css = getComputedStyle(document.documentElement);
+  const v = (n, d) => (css.getPropertyValue(n).trim() || d);
+  const INK = v('--c-ink', '#222222');
+  let ALPHA = parseFloat(v('--dot-alpha', .16));
+  let SPEED = parseFloat(v('--speed', 1));
+
+  let W = 0, H = 0, DPR = 1, CELL = 11, pts = [];
+  const COS = Math.SQRT1_2, SIN = Math.SQRT1_2;   // 45°
+
+  // 흘러가는 빛 덩어리 (위치는 화면 비율, 반경은 짧은 변 비율)
+  const blobs = [
+    { x:.82, y:.22, r:.36, ax:.10, ay:.08, fx:.050, fy:.037, p:0.0, w:1.00 },
+    { x:.14, y:.84, r:.32, ax:.09, ay:.08, fx:.041, fy:.055, p:2.1, w:.90 },
+    { x:.52, y:.58, r:.20, ax:.24, ay:.16, fx:.027, fy:.033, p:4.2, w:.50 },
+  ];
+
+  function build(){
+    CELL = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dot-cell')) || 11;
+    W = cv.clientWidth; H = cv.clientHeight; DPR = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    // 45° 회전 격자 점을 화면 좌표로 미리 계산
+    pts = [];
+    const R = Math.hypot(W, H) / 2 + CELL, cx = W / 2, cy = H / 2;
+    for (let u = -R; u <= R; u += CELL){
+      for (let w = -R; w <= R; w += CELL){
+        const x = cx + u * COS - w * SIN, y = cy + u * SIN + w * COS;
+        if (x > -CELL && x < W + CELL && y > -CELL && y < H + CELL) pts.push(x, y);
+      }
+    }
+    draw(performance.now());
+  }
+
+  function draw(now){
+    const t = now / 1000 * SPEED, S = Math.min(W, H);
+    const B = blobs.map(b => ({
+      x: (b.x + Math.sin(t * b.fx * 6.283 + b.p) * b.ax) * W,
+      y: (b.y + Math.cos(t * b.fy * 6.283 + b.p) * b.ay) * H,
+      k: 1 / Math.pow(b.r * S, 2), w: b.w,
+    }));
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = INK; g.globalAlpha = ALPHA;
+    g.beginPath();
+    const maxR = CELL * .5, wave = t * .35;
+    for (let i = 0; i < pts.length; i += 2){
+      const x = pts[i], y = pts[i + 1];
+      let s = 0;
+      for (let j = 0; j < 3; j++){ const b = B[j], dx = x - b.x, dy = y - b.y; s += b.w * Math.exp(-(dx * dx + dy * dy) * b.k); }
+      s += .03 * Math.sin((x + y) / S * 7 - wave);                      // 아주 옅은 물결
+      if (s <= .07) continue;
+      const r = Math.sqrt(Math.min(s, 1)) * maxR;
+      g.moveTo(x + r, y); g.arc(x, y, r, 0, 6.2832);
+    }
+    g.fill();
+  }
+
+  let last = 0;
+  function loop(now){
+    if (SPEED > 0 && now - last > 33){ last = now; draw(now); }   // ~30fps
+    requestAnimationFrame(loop);
+  }
+  new ResizeObserver(build).observe(cv);
+  window.addEventListener('orientationchange', () => setTimeout(build, 250));
+  build(); requestAnimationFrame(loop);
+
+})();
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* =========================================================
+   0. BASICS
+   ========================================================= */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const damp  = (c, t, k, dt) => c + (t - c) * (1 - Math.exp(-k * dt));
+const rootCss = getComputedStyle(document.documentElement);
+const cssVar = n => rootCss.getPropertyValue(n).trim();
+function hexToVec(hex){
+  let h = hex.replace('#','');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const n = parseInt(h.slice(0,6), 16);
+  return new THREE.Vector3(((n>>16)&255)/255, ((n>>8)&255)/255, (n&255)/255);
+}
+const INK = cssVar('--c-ink') || '#222222';
+const PAPER = cssVar('--c-paper') || '#fafafa';
+const POCKET = cssVar('--c-pocket') || '#cfcfcf';
+const isMobile = () => matchMedia('(max-width: 760px)').matches;
+// 스프링 (x: 값, v: 속도)
+const spring = (o, dt, k = 170, c = 13) => { o.v += (-k * o.x - c * o.v) * dt; o.x += o.v * dt; };
+
+/* =========================================================
+   1. DATA
+   ========================================================= */
+/* ---- 노래 (mp3 재생 목록) ----
+   테이프 A·B 의 list 에 곡을 추가/삭제하면 재생 목록이 바뀝니다.  { title:'곡 제목', url:RAW + '파일명' }
+   GitHub 파일은 raw.githubusercontent.com/{계정}/{저장소}/main/{파일명} 형식이어야 재생됩니다.
+   테이프 C·D 는 내장 베이스 연주(신스). 링크가 열리지 않는 곡은 건너뛰고, 전부 실패하면 신스로 대체. */
+const RAW = 'https://raw.githubusercontent.com/ashengale/nyalog/main/';
+const SONG_VOLUME = 0.15;   // mp3 노래 볼륨 (0 ~ 1)
+
+const TRACK_LEN = 40;   // 내장 신스 트랙 길이 (sec)
+const VOLUME = 0.16;    // 내장 신스 볼륨 (0 ~ 1)
+const SFX_VOLUME = 0.25; // 효과음 볼륨 (0 ~ 1)
+const TAPES = [
+  { id:'A', name:'MORNING STATIC', side:'SIDE A', len:'C-60', pattern:'hatch',   band:cssVar('--c-band-a')||'#d0d0d0',
+    root:220.00, scale:[0,2,4,7,9,12,14,16], bpm:84, wave:'triangle',
+    tracks:['Paper Light','Dot Gain','Soft Register','Low Fade'],
+    list:[
+      { title:'名もない色',         url:RAW + '%E5%90%8D%E3%82%82%E3%81%AA%E3%81%84%E8%89%B2.mp3' },
+      { title:'不器用なノイズ',      url:RAW + '%E4%B8%8D%E5%99%A8%E7%94%A8%E3%81%AA%E3%83%8E%E3%82%A4%E3%82%BA.mp3' },
+      { title:'僕が印をつけたもの',   url:RAW + '%E5%83%95%E3%81%8C%E5%8D%B0%E3%82%92%E3%81%A4%E3%81%91%E3%81%9F%E3%82%82%E3%81%AE.mp3' },
+    ] },
+  { id:'B', name:'NIGHT GRAIN',    side:'SIDE A', len:'C-46', pattern:'dots',    band:cssVar('--c-band-b')||'#a9a9a9',
+    root:174.61, scale:[0,3,5,7,10,12,15,17], bpm:72, wave:'sine',
+    tracks:['Grain Theory','45° Screen','Ink Trap','After Hours'],
+    list:[
+      { title:'秘密の檻', url:RAW + '%E7%A7%98%E5%AF%86%E3%81%AE%E6%AA%BB.mp3' },
+      { title:'棘の律',   url:RAW + '%E6%A3%98%E3%81%AE%E5%BE%8B.mp3' },
+      { title:'共犯',     url:RAW + '%E5%85%B1%E7%8A%AF.mp3' },
+    ] },
+  { id:'C', name:'MONO RIVER',     side:'SIDE B', len:'C-90', pattern:'checker', band:cssVar('--c-band-c')||'#bdbdbd',
+    root:196.00, scale:[0,2,3,5,7,9,10,12], bpm:96, wave:'triangle',
+    style:'bass', bass:82.41,   // E2
+    tracks:['Root Note','Walking Line','Thumb & Ink','Ghost Note'] },
+  { id:'D', name:'SOFT CARBON',    side:'SIDE B', len:'C-60', pattern:'lines',   band:cssVar('--c-band-d')||'#b4b4b4',
+    root:246.94, scale:[0,2,4,7,9,12,14,16], bpm:84, wave:'sine',
+    style:'bass', bass:73.42,   // D2
+    tracks:['Deep Carbon','Octave Drift','Slow Pluck','Last Groove'] },
+];
+const fmt = s => { s = Math.max(0, Math.floor(s)); return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0'); };
+
+/* =========================================================
+   2. AUDIO (WebAudio — 생성형 로파이 + 기계음)
+   ========================================================= */
+const Audio = {
+  ctx:null, on:true, timer:null, pads:null, active:false,
+  init(){
+    if (this.ctx) return true;
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return false;
+    const c = this.ctx = new AC();
+    this.out = c.createGain(); this.out.gain.value = this.on ? 1 : 0; this.out.connect(c.destination);
+    this.an = c.createAnalyser(); this.an.fftSize = 512; this.buf = new Float32Array(512);
+    this.an.connect(this.out);
+    this.tone = c.createBiquadFilter(); this.tone.type = 'lowpass'; this.tone.frequency.value = 2600; this.tone.Q.value = .5;
+    this.tone.connect(this.an);
+    this.bus = c.createGain(); this.bus.gain.value = 0; this.bus.connect(this.tone);
+    this.mod = c.createGain(); this.mod.gain.value = 1;                         // wow & flutter
+    const wow = c.createOscillator(); wow.frequency.value = .55; const wg = c.createGain(); wg.gain.value = 8;
+    const flu = c.createOscillator(); flu.frequency.value = 6.3; const fg = c.createGain(); fg.gain.value = 2.5;
+    wow.connect(wg).connect(this.mod); flu.connect(fg).connect(this.mod); wow.start(); flu.start();
+    const nb = c.createBuffer(1, c.sampleRate * 2, c.sampleRate), d = nb.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    this.noise = nb;
+    return true;
+  },
+  resume(){ if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
+  setOn(v){ this.on = v; if (this.ctx) this.out.gain.setTargetAtTime(v ? 1 : 0, this.ctx.currentTime, .05); if (Song.el) Song.el.muted = !v; },
+  start(tape, getTrack, withSynth = true){
+    if (!this.init()) return; this.resume(); this.stop(true);
+    const c = this.ctx, t = c.currentTime;
+    this.tape = tape; this.getTrack = getTrack; this.lastTrack = -1; this.active = true;
+    this.bus.gain.cancelScheduledValues(t); this.bus.gain.setValueAtTime(0, t); this.bus.gain.linearRampToValueAtTime(VOLUME, t + .3);
+    const h = c.createBufferSource(); h.buffer = this.noise; h.loop = true;
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 5200; bp.Q.value = .6;
+    const hg = c.createGain(); hg.gain.value = .018;
+    h.connect(bp).connect(hg).connect(this.bus); h.start(); this.hiss = h;
+    if (!withSynth) return;                                                  // mp3 재생 시엔 테이프 히스만
+    this.step = 0; this.next = t + .12;
+    if (tape.style === 'bass'){ this.timer = setInterval(() => this.sched(), 25); return; }   // 베이스 연주 : 패드 없음
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 620;
+    const pg = c.createGain(); pg.gain.value = .022; lp.connect(pg).connect(this.bus);
+    this.pads = [0, 7, 12 + tape.scale[2]].map(s => {
+      const o = c.createOscillator(); o.type = 'sawtooth';
+      o.frequency.value = tape.root / 2 * 2 ** (s / 12);
+      this.mod.connect(o.detune);
+      o.detune.setValueAtTime(-900, t); o.detune.linearRampToValueAtTime(0, t + .35);   // 모터 스핀업
+      o.connect(lp); o.start(); o._s = s; return o;
+    });
+    this.timer = setInterval(() => this.sched(), 25);
+  },
+  sched(){
+    const c = this.ctx, tp = this.tape, spb = 60 / tp.bpm / 2;
+    while (this.next < c.currentTime + .12){ this.note(this.next); this.next += spb; this.step++; }
+  },
+  note(t){
+    if (this.tape.style === 'bass') return this.bassNote(t);
+    const c = this.ctx, tp = this.tape, tr = this.getTrack(), off = [0,5,-2,3][tr] || 0;
+    if (tr !== this.lastTrack && this.pads){
+      this.lastTrack = tr;
+      this.pads.forEach(o => o.frequency.setTargetAtTime(tp.root / 2 * 2 ** ((o._s + off) / 12), t, .25));
+    }
+    const pat = [0,2,4,2,5,4,2,1, 0,3,5,3,6,4,3,2], st = this.step % 16;
+    if (st % 8 === 7 && Math.random() < .5) return;
+    const idx = (pat[st] + tr) % tp.scale.length;
+    const f = tp.root * 2 ** ((tp.scale[idx] + off) / 12);
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = tp.wave; o.frequency.value = f; this.mod.connect(o.detune);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.085, t + .01); g.gain.exponentialRampToValueAtTime(.0008, t + .55);
+    o.connect(g).connect(this.bus); o.start(t); o.stop(t + .6);
+    if (st % 4 === 0){
+      const b = c.createOscillator(), bg = c.createGain(); b.type = 'sine';
+      b.frequency.value = tp.root / 4 * 2 ** (off / 12);
+      bg.gain.setValueAtTime(0, t); bg.gain.linearRampToValueAtTime(.11, t + .01); bg.gain.exponentialRampToValueAtTime(.001, t + .45);
+      b.connect(bg).connect(this.bus); b.start(t); b.stop(t + .5);
+    }
+  },
+  /* ---- 베이스 연주 (8분음표 단위, 트랙마다 다른 리프·코드 진행) ---- */
+  bassNote(t){
+    const tp = this.tape, tr = this.getTrack(), st = this.step % 8, bar = Math.floor(this.step / 8) % 4;
+    const spb = 60 / tp.bpm / 2, _ = null;
+    const PAT = [
+      [0,_,0,12, _,7,10,_],        // groove
+      [0,4,7,9, 12,9,7,4],         // walking
+      [0,_,12,0, _,0,10,12],       // octave pop
+      [0,_,_,7, _,_,5,3],          // slow
+    ][tr] || [0,_,0,_,0,_,0,_];
+    const PROG = [[0,0,5,7],[0,-2,-4,-5],[0,3,5,-2],[0,5,-4,-2]][tr] || [0,0,0,0];
+    const n = PAT[st];
+    if (n !== null) this.bassVoice(t, tp.bass * 2 ** ((PROG[bar] + n) / 12), spb * (tr === 3 ? 2.6 : .9));
+    if (st % 4 === 0) this.kick(t);                                          // 1, 3 박
+    if (st % 4 === 2) this.hit(t, 'bandpass', 1900, .1, .09);                // 2, 4 박 (림)
+    this.hit(t, 'highpass', 7500, st % 2 ? .03 : .018, .03);                 // 하이햇
+  },
+  bassVoice(t, f, dur){
+    const c = this.ctx;
+    const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; this.mod.connect(o.detune);
+    const sb = c.createOscillator(); sb.type = 'sine'; sb.frequency.value = f;
+    const sg = c.createGain(); sg.gain.value = .7;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 4;
+    lp.frequency.setValueAtTime(f * 9, t); lp.frequency.exponentialRampToValueAtTime(f * 2.2, t + .16);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.22, t + .006);
+    g.gain.setTargetAtTime(.13, t + .02, .08); g.gain.setTargetAtTime(0, t + dur, .04);
+    o.connect(lp); sb.connect(sg).connect(lp); lp.connect(g).connect(this.bus);
+    o.start(t); sb.start(t); o.stop(t + dur + .3); sb.stop(t + dur + .3);
+  },
+  kick(t){
+    const c = this.ctx, o = c.createOscillator(), g = c.createGain();
+    o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(42, t + .12);
+    g.gain.setValueAtTime(.42, t); g.gain.exponentialRampToValueAtTime(.001, t + .28);
+    o.connect(g).connect(this.bus); o.start(t); o.stop(t + .3);
+  },
+  hit(t, type, freq, gain, len){
+    const c = this.ctx, n = c.createBufferSource(); n.buffer = this.noise;
+    const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = .8;
+    const g = c.createGain(); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(.001, t + len);
+    n.connect(f).connect(g).connect(this.bus); n.start(t, Math.random() * 1.5); n.stop(t + len + .02);
+  },
+  stop(instant){
+    if (!this.ctx) return;
+    clearInterval(this.timer); this.timer = null; this.active = false;
+    const c = this.ctx, t = c.currentTime, d = instant ? .03 : .45;
+    if (this.pads) this.pads.forEach(o => {
+      o.detune.cancelScheduledValues(t); o.detune.setValueAtTime(0, t);
+      o.detune.linearRampToValueAtTime(instant ? 0 : -1500, t + d);           // 테이프 스톱 피치 다운
+      o.stop(t + d + .05);
+    });
+    this.bus.gain.cancelScheduledValues(t); this.bus.gain.setValueAtTime(this.bus.gain.value, t);
+    this.bus.gain.linearRampToValueAtTime(0, t + d);
+    if (this.hiss) this.hiss.stop(t + d + .05);
+    this.pads = null; this.hiss = null;
+  },
+  sfx(kind){
+    if (!this.init()) return; this.resume();
+    const c = this.ctx, t = c.currentTime;
+    const n = c.createBufferSource(); n.buffer = this.noise;
+    const f = c.createBiquadFilter(); f.type = 'bandpass';
+    f.frequency.value = kind === 'eject' ? 1400 : kind === 'btn' ? 3200 : 2200; f.Q.value = 1.2;
+    const g = c.createGain(); g.gain.setValueAtTime((kind === 'btn' ? .25 : .45) * SFX_VOLUME, t); g.gain.exponentialRampToValueAtTime(.001, t + (kind === 'btn' ? .03 : .07));
+    n.connect(f).connect(g).connect(this.out); n.start(t); n.stop(t + .1);
+    if (kind !== 'btn'){
+      const o = c.createOscillator(), og = c.createGain(); o.type = 'sine';
+      o.frequency.setValueAtTime(kind === 'eject' ? 140 : 110, t); o.frequency.exponentialRampToValueAtTime(48, t + .12);
+      og.gain.setValueAtTime(.5 * SFX_VOLUME, t); og.gain.exponentialRampToValueAtTime(.001, t + .14);
+      o.connect(og).connect(this.out); o.start(t); o.stop(t + .16);
+    }
+  },
+  level(song){
+    if (!this.ctx || !this.active) return 0;
+    if (song && !Song.node) return 0;                                         // 분석 불가(CORS) → 시뮬레이션 미터
+    this.an.getFloatTimeDomainData(this.buf);
+    let s = 0; for (let i = 0; i < this.buf.length; i++) s += this.buf[i] * this.buf[i];
+    const k = song ? 2.6 / Math.max(SONG_VOLUME, .01) : 7 * (.9 / Math.max(VOLUME, .01));   // 볼륨과 무관하게 미터 표시
+    return Math.min(1, Math.sqrt(s / this.buf.length) * k);
+  }
+};
+
+/* =========================================================
+   2-1. SONG (mp3 스트리밍)
+   - 먼저 CORS 모드로 시도 → 성공 시 WebAudio 로 볼륨/VU 분석
+   - 서버가 CORS 를 허용하지 않으면 일반 <audio> 재생으로 자동 전환
+   - 링크가 열리지 않으면 내장 신스로 대체
+   ========================================================= */
+const Song = {
+  el:null, url:'', cors:true, corsOK:null, node:null, durs:{}, failed:new Set(),
+  pendingSeek:null, wantPlay:false, primed:false,
+  make(cors, url){
+    if (this.el){ this.el.pause(); }
+    const el = document.createElement('audio');
+    el.preload = 'auto'; el.playsInline = true; el.setAttribute('playsinline', '');
+    if (cors) el.crossOrigin = 'anonymous';
+    el.muted = !Audio.on; el.volume = cors ? 1 : SONG_VOLUME;
+    el.addEventListener('loadedmetadata', () => {
+      if (this.el !== el) return;
+      this.durs[this.url] = isFinite(el.duration) ? el.duration : 0;
+      if (this.cors) this.corsOK = true;
+      if (this.pendingSeek != null){ el.currentTime = this.pendingSeek * (this.durs[this.url] || 0); this.pendingSeek = null; }
+    });
+    el.addEventListener('error', () => {
+      if (this.el !== el || !el.getAttribute('src')) return;
+      if (this.cors && !this.corsOK){                                       // CORS 불가 → 일반 <audio> 재생으로 전환
+        this.corsOK = false;
+        const want = this.wantPlay, frac = this.pendingSeek;
+        this.make(false, this.url);
+        if (want) this.play(frac ?? (loaded ? loaded.progress : 0)).catch(onSongBlocked);
+      } else { this.failed.add(this.url); onSongFail(this.url); }          // 링크 자체 실패 → 신스로 대체
+    });
+    el.addEventListener('ended', () => { if (this.el === el) onSongEnd(); });
+    this.el = el; this.cors = cors; this.node = null; this.primed = false; this.url = url;
+    el.src = url; el.load();
+  },
+  load(url){
+    if (!url || this.failed.has(url)) return;
+    const cors = this.corsOK !== false;
+    if (this.el && this.cors === cors){                                     // 같은 요소 재사용 (모바일 재생 잠금 유지)
+      if (this.url !== url){ this.el.pause(); this.url = url; this.pendingSeek = null; this.el.src = url; this.el.load(); }
+      return;
+    }
+    this.make(cors, url);
+  },
+  prime(){                                                                   // iOS 등: 사용자 제스처 안에서 한 번 재생해 잠금 해제
+    if (!this.el || this.primed) return;
+    const el = this.el; this.primed = true; el.muted = true;
+    const p = el.play();
+    if (p) p.then(() => { if (!this.wantPlay) el.pause(); el.muted = !Audio.on; })
+            .catch(() => { el.muted = !Audio.on; this.primed = false; });
+  },
+  connect(){
+    if (!this.cors || this.node || !Audio.ctx) return;
+    try {
+      this.node = Audio.ctx.createMediaElementSource(this.el);
+      const g = Audio.ctx.createGain(); g.gain.value = SONG_VOLUME;
+      this.node.connect(g).connect(Audio.an); this.el.volume = 1;
+    } catch(e){ this.node = null; this.el.volume = SONG_VOLUME; }
+  },
+  play(frac){
+    this.wantPlay = true;
+    Audio.init(); Audio.resume(); this.connect();
+    const el = this.el; el.muted = !Audio.on; if (!this.node) el.volume = SONG_VOLUME;
+    this.seek(frac);
+    return el.play() || Promise.resolve();
+  },
+  pause(){ this.wantPlay = false; if (this.el) this.el.pause(); },
+  seek(frac){
+    const d = this.durs[this.url] || 0;
+    if (this.el && this.el.readyState >= 1 && d) this.el.currentTime = clamp(frac, 0, 1) * d; else this.pendingSeek = frac;
+  },
+  time(){ return this.el ? this.el.currentTime : 0; },
+};
+const hasList  = tp => !!(tp && tp.list && tp.list.length);
+const usesSong = tp => hasList(tp) && tp.list.some(x => !Song.failed.has(x.url));
+const curSong  = tp => tp.list[tp.tr || 0];
+const tapeDur  = tp => usesSong(tp) ? (Song.durs[curSong(tp).url] || 0) : TRACK_LEN * 4;   // 곡 테이프는 현재 곡 길이
+const dispFrac = tp => usesSong(tp) ? tp.frac : tp.progress;                              // 표시용 진행률
+const syncProg = tp => { tp.progress = clamp((tp.tr + tp.frac) / tp.list.length, 0, 1); }; // 릴 감김 = 테이프 전체
+const nextPlayable = (tp, from) => { for (let i = from; i < tp.list.length; i++) if (!Song.failed.has(tp.list[i].url)) return i; return -1; };
+function probeDurs(tp){                                                       // 재생 목록 곡 길이 미리 읽기
+  if (!hasList(tp)) return;
+  tp.list.forEach(x => {
+    if (Song.durs[x.url] || x.probing) return; x.probing = true;
+    const a = document.createElement('audio'); a.preload = 'metadata';
+    a.onloadedmetadata = () => { if (isFinite(a.duration)) Song.durs[x.url] = a.duration; a.removeAttribute('src'); a.load(); npSig = ''; };
+    a.onerror = () => { x.probing = false; };
+    a.src = x.url;
+  });
+}
+function startSong(tp){ Song.load(curSong(tp).url); Song.play(tp.frac).catch(onSongBlocked); }
+function unlockAudio(tp){                                                    // 제스처 시점에 오디오 준비
+  Audio.init(); Audio.resume();
+  if (!Song.el){ const t = hasList(tp) ? tp : hasList(loaded) ? loaded : tapes.find(hasList); if (t) Song.load(curSong(t).url); }
+  Song.prime();
+}
+
+/* =========================================================
+   3. THREE SETUP — Orthographic camera (1 unit = 1 css px)
+   ========================================================= */
+const canvas = $('#gl');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+renderer.setClearColor(0x000000, 0);                      // 투명 배경
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+renderer.setPixelRatio(DPR);
+const scene = new THREE.Scene();
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 6000);
+camera.position.z = 3000;
+
+/* ---- Halftone shader ---- */
+const U = {
+  uInk:   { value: hexToVec(INK) },
+  uPaper: { value: hexToVec(PAPER) },
+  uDpr:   { value: DPR },
+  uCell:  { value: 4.2 },
+};
+const VS = `
+varying vec3 vN; varying vec2 vUv;
+void main(){
+  vUv = uv;
+  vN = normalize(normalMatrix * normal);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+const FS = `
+uniform vec3 uInk; uniform vec3 uPaper;
+uniform sampler2D uMap; uniform float uUseMap; uniform float uBase; uniform float uFlat;
+uniform float uTone; uniform float uLit; uniform float uCell; uniform float uDpr;
+varying vec3 vN; varying vec2 vUv;
+void main(){
+  vec4 t = uUseMap > .5 ? texture2D(uMap, vUv) : vec4(vec3(uBase), 1.0);
+  if (t.a < .5) discard;
+  float lum = dot(t.rgb, vec3(.299, .587, .114));
+  if (uFlat > .5){ gl_FragColor = vec4(mix(uInk, uPaper, smoothstep(.3, .7, lum)), 1.0); return; }  // 인쇄면(텍스트) 선명하게
+  if (lum < .22){ gl_FragColor = vec4(uInk, 1.0); return; }          // 잉크 영역은 솔리드
+  vec3 L = normalize(vec3(-.3, .45, 1.0));
+  float d = max(dot(normalize(vN), L), 0.0);
+  float light = mix(1.0, clamp(.3 + .78 * d, 0.0, 1.0), uLit);
+  float shade = clamp(1.0 - lum * light + uTone, 0.0, 1.0);
+  shade = clamp((shade - .1) / .9, 0.0, 1.0);
+  float px = uCell * uDpr;
+  vec2 p = mat2(.7071, -.7071, .7071, .7071) * gl_FragCoord.xy / px;   // 45° 스크린 각도
+  vec2 g = fract(p) - .5;
+  float r = sqrt(shade) * .72;
+  float aa = .9 / px;
+  float m = 1.0 - smoothstep(r - aa, r + aa, length(g));
+  m *= step(.015, shade);
+  gl_FragColor = vec4(mix(uPaper, uInk, m), 1.0);
+}`;
+function htMat({ map = null, base = .98, tone = 0, lit = 1, flat = 0 } = {}){
+  return new THREE.ShaderMaterial({
+    uniforms: { ...U, uMap:{ value:map }, uUseMap:{ value: map ? 1 : 0 }, uBase:{ value:base },
+                uTone:{ value:tone }, uLit:{ value:lit }, uFlat:{ value:flat } },
+    vertexShader: VS, fragmentShader: FS,
+    polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1,
+  });
+}
+const lineMat = new THREE.LineBasicMaterial({ color: new THREE.Color(INK) });
+const inkMat  = new THREE.MeshBasicMaterial({ color: new THREE.Color(INK) });
+const edges = (geo, angle = 22) => new THREE.LineSegments(new THREE.EdgesGeometry(geo, angle), lineMat);
+
+/* ---- geometry / canvas helpers ---- */
+function rrShape(w, h, r, cx = 0, cy = 0, Cls = THREE.Shape){
+  const s = new Cls(), x = cx - w/2, y = cy - h/2;
+  s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.absarc(x + w - r, y + r, r, -Math.PI/2, 0, false);
+  s.lineTo(x + w, y + h - r); s.absarc(x + w - r, y + h - r, r, 0, Math.PI/2, false);
+  s.lineTo(x + r, y + h); s.absarc(x + r, y + h - r, r, Math.PI/2, Math.PI, false);
+  s.lineTo(x, y + r); s.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5, false);
+  return s;
+}
+const rrHole = (w, h, r, cx, cy) => rrShape(w, h, r, cx, cy, THREE.Path);
+function rr(g, x, y, w, h, r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+function makeCanvas(wu, hu, k){
+  const c = document.createElement('canvas'); c.width = Math.round(wu * k); c.height = Math.round(hu * k);
+  const g = c.getContext('2d'); g.scale(k, k); return { c, g };
+}
+function toTex(c){
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t;
+}
+const ICONS = {   // 18×18 viewBox
+  play:'M5 3l11 6-11 6z', pause:'M4 3h4v12H4zM10 3h4v12h-4z', stop:'M4 4h10v10H4z', eject:'M9 3l6 7H3zM3 12h12v3H3z',
+  info:'M9 2a7 7 0 1 1 0 14A7 7 0 0 1 9 2zm0 2a5 5 0 1 0 0 10A5 5 0 0 0 9 4zM8 8h2v4.4H8zM8 5.2h2v2H8z',
+};
+
+/* =========================================================
+   4. CASSETTE (3D)
+   ========================================================= */
+const W = 100, H = 63, D = 11;      // cassette units
+const LBL = { w:90, h:43, cy:6.5 };
+const WIN_Y = 5.5, HUB_X = 18.5;
+function labelTexture(t){
+  const { c, g } = makeCanvas(LBL.w, LBL.h, 12);
+  rr(g, .4, .4, 89.2, 42.2, 2.6); g.fillStyle = PAPER; g.fill();
+  g.save(); rr(g, .4, .4, 89.2, 42.2, 2.6); g.clip(); g.fillStyle = t.band; g.fillRect(0, 11.6, 90, 21.4); g.restore();
+  rr(g, 2, 2, 86, 8, 1.2); g.fillStyle = INK; g.fill();
+  g.fillStyle = PAPER; g.font = '900 5px Unbounded'; g.fillText('HALF/TONE', 4, 8.15);
+  g.font = '700 2.3px "JetBrains Mono"'; g.textAlign = 'right'; g.fillText(`${t.len} · TYPE I`, 86, 7.6); g.textAlign = 'left';
+  g.fillStyle = INK; g.fillRect(3.6, 14, 9.6, 9.6);
+  g.fillStyle = PAPER; g.font = '900 7.2px Unbounded'; g.textAlign = 'center'; g.fillText(t.id, 8.4, 21.7);
+  g.fillStyle = INK; g.font = '800 1.9px "JetBrains Mono"'; g.fillText('SIDE', 8.4, 26.4); g.fillText(t.side.slice(-1), 8.4, 29.2);
+  g.textAlign = 'left';
+  g.save(); g.translate(81.2, 19.2); g.strokeStyle = INK; g.lineWidth = 1.9;
+  g.beginPath(); g.moveTo(-3.6,-3.6); g.lineTo(1.4,1.4); g.stroke();
+  g.fillStyle = INK; g.beginPath(); g.moveTo(3.8,3.8); g.lineTo(3.8,-1.6); g.lineTo(-1.6,3.8); g.closePath(); g.fill(); g.restore();
+  g.lineWidth = .35; g.strokeStyle = INK; g.strokeRect(76.6, 25.4, 9.2, 3.2);
+  g.font = '800 1.8px "JetBrains Mono"'; g.fillStyle = INK; g.textAlign = 'center'; g.fillText('STEREO', 81.2, 27.6); g.textAlign = 'left';
+  g.lineWidth = .3;
+  for (let i = 0; i <= 8; i++){ const x = 34 + i * 2.75, l = i === 4 ? 1.6 : .9; g.beginPath(); g.moveTo(x, 13.4 - l); g.lineTo(x, 13.4); g.stroke(); }
+  rr(g, 16, 14, 58, 17, 8.5); g.save(); g.globalCompositeOperation = 'destination-out'; g.fill(); g.restore();   // 투명 창
+  g.lineWidth = .55; rr(g, 16, 14, 58, 17, 8.5); g.stroke();
+  g.fillStyle = INK; g.font = '800 3.1px "JetBrains Mono"'; g.fillText(t.name, 4, 37.4);
+  g.font = '500 1.8px "JetBrains Mono"'; g.fillText(`${t.side} · STEREO · 120µs EQ`, 4, 40.3);
+  g.save(); g.beginPath(); g.rect(61, 34.2, 25, 6); g.clip(); g.fillStyle = INK; g.strokeStyle = INK;
+  if (t.pattern === 'hatch'){ g.lineWidth = .7; for (let x = 55; x < 92; x += 1.8){ g.beginPath(); g.moveTo(x, 41); g.lineTo(x + 7, 33); g.stroke(); } }
+  if (t.pattern === 'dots'){ for (let y = 35; y < 41; y += 1.5) for (let x = 61.8; x < 87; x += 1.5){ g.beginPath(); g.arc(x + ((y*2|0)%2)*.75, y, .48, 0, 7); g.fill(); } }
+  if (t.pattern === 'lines'){ for (let y = 35; y < 41; y += 1.2) g.fillRect(61, y, 25, .5); }
+  if (t.pattern === 'checker'){ for (let y = 34.2, r = 0; y < 41; y += 1.5, r++) for (let x = 61, q = 0; x < 87; x += 1.5, q++) if ((r + q) % 2) g.fillRect(x, y, 1.5, 1.5); }
+  g.restore(); g.lineWidth = .35; g.strokeRect(61, 34.2, 25, 6);
+  g.lineWidth = .6; rr(g, .4, .4, 89.2, 42.2, 2.6); g.stroke();
+  return toTex(c);
+}
+function hubTexture(){
+  const { c, g } = makeCanvas(256, 256, 1);
+  g.translate(128, 128);
+  g.beginPath(); g.arc(0, 0, 122, 0, 7); g.fillStyle = PAPER; g.fill(); g.lineWidth = 9; g.strokeStyle = INK; g.stroke();
+  for (let i = 0; i < 3; i++){ const a = i * Math.PI * 2 / 3; g.beginPath(); g.arc(Math.cos(a)*88, Math.sin(a)*88, 9, 0, 7); g.fillStyle = INK; g.fill(); }
+  g.beginPath(); g.arc(0, 0, 62, 0, 7); g.fillStyle = INK; g.fill();
+  g.beginPath(); g.arc(0, 0, 46, 0, 7); g.fillStyle = PAPER; g.fill();
+  g.fillStyle = INK;
+  for (let i = 0; i < 6; i++){ g.save(); g.rotate(i * Math.PI / 3); g.fillRect(-7, -48, 14, 18); g.restore(); }
+  return toTex(c);
+}
+const hits = [];   // raycast 대상
+function buildCassette(t, i, hubTex){
+  const g = new THREE.Group();
+  const tag = { kind:'tape', idx:i };
+  const bodyGeo = new THREE.ExtrudeGeometry(rrShape(W, H, 4), { depth:D, bevelEnabled:false, curveSegments:8 });
+  bodyGeo.translate(0, 0, -D/2);
+  const body = new THREE.Mesh(bodyGeo, htMat({ base:.97 })); body.userData = tag;
+  g.add(body, edges(bodyGeo)); hits.push(body);
+  const tr = new THREE.Shape(); tr.moveTo(-33,-31.5); tr.lineTo(33,-31.5); tr.lineTo(27,-18.6); tr.lineTo(-27,-18.6); tr.closePath();
+  const trGeo = new THREE.ExtrudeGeometry(tr, { depth:1.5, bevelEnabled:false }); trGeo.translate(0, 0, D/2);
+  const ridge = new THREE.Mesh(trGeo, htMat({ base:.93 })); ridge.userData = tag;
+  g.add(ridge, edges(trGeo)); hits.push(ridge);
+  [[-20,-24.5,2.1],[20,-24.5,2.1],[-9,-27,1.4],[9,-27,1.4]].forEach(([x,y,r]) => {
+    const h = new THREE.Mesh(new THREE.CircleGeometry(r, 24), inkMat); h.position.set(x, y, D/2 + 1.56); g.add(h);
+  });
+  [[-46.5,27.5],[46.5,27.5],[-46.5,-27.5],[46.5,-27.5],[0,-22]].forEach(([x,y]) => {
+    const z = x === 0 ? D/2 + 1.5 : D/2;
+    const sg = new THREE.CylinderGeometry(1.7, 1.7, .5, 18); sg.rotateX(Math.PI/2);
+    const s = new THREE.Mesh(sg, htMat({ base:.9 })); s.position.set(x, y, z + .25); g.add(s);
+    const sl = edges(sg, 30); sl.position.copy(s.position); g.add(sl);
+    const c1 = new THREE.Mesh(new THREE.PlaneGeometry(2.2, .45), inkMat); c1.position.set(x, y, z + .52);
+    const c2 = c1.clone(); c2.rotation.z = Math.PI/2; g.add(c1, c2);
+  });
+  const floor = new THREE.Mesh(new THREE.ShapeGeometry(rrShape(58, 17, 8.5), 16), htMat({ base:.8 }));
+  floor.position.set(0, WIN_Y, D/2 + .02); g.add(floor);
+  const spools = [-1, 1].map(s => {
+    const m = new THREE.Mesh(new THREE.CircleGeometry(1, 48), htMat({ base:.34 }));
+    m.position.set(s * HUB_X, WIN_Y, D/2 + .04); g.add(m); return m;
+  });
+  const lbl = new THREE.Mesh(new THREE.PlaneGeometry(LBL.w, LBL.h), htMat({ map: labelTexture(t) }));
+  lbl.position.set(0, LBL.cy, D/2 + .07); lbl.userData = tag; g.add(lbl); hits.push(lbl);
+  const hubs = [-1, 1].map(s => {
+    const m = new THREE.Mesh(new THREE.CircleGeometry(5.1, 40), htMat({ map: hubTex }));
+    m.position.set(s * HUB_X, WIN_Y, D/2 + .1); g.add(m); return m;
+  });
+  const shadow = new THREE.Mesh(new THREE.ShapeGeometry(rrShape(W, H, 4), 8), htMat({ base:.6, lit:0 }));
+  shadow.position.z = -D/2 - 6; g.add(shadow);
+  scene.add(g);
+  return { group:g, spools, hubs, shadow };
+}
+
+/* =========================================================
+   5. PLAYER (3D)  — 본체 · 포켓 · 도어 · LCD · 스피커 · 버튼 · 노브
+   ========================================================= */
+const DW = 150, DH = 150, SHELL = 14, DD = 36;          // deck units
+const POCK = { w:106, h:69, y:30 };
+const HINGE_Y = POCK.y - POCK.h / 2;                    // 도어 힌지 (포켓 아래)
+const LCDU = { w:82, h:24, x:-29, y:-24 };
+const SPK = { x:47, y:-24, r:13 };
+const BTN_ACTS = ['play','stop','eject','info'];
+
+function stripTexture(){
+  const { c, g } = makeCanvas(132, 7, 12);
+  g.fillStyle = PAPER; g.fillRect(0, 0, 132, 7);
+  g.fillStyle = INK; g.font = '800 3px "JetBrains Mono"'; g.textBaseline = 'middle';
+  g.fillText('UNIT 01', 5, 3.6);
+  g.textAlign = 'right'; g.fillText('HT-DECK / STEREO', 132, 3.6);
+  g.textAlign = 'left';
+  for (let i = 0; i < 3; i++){ const x = 58 + i * 4.2; g.beginPath(); g.moveTo(x, 1.6); g.lineTo(x + 2, 1.6); g.lineTo(x + 4, 3.5); g.lineTo(x + 2, 5.4); g.lineTo(x, 5.4); g.lineTo(x + 2, 3.5); g.closePath(); g.fill(); }
+  return toTex(c);
+}
+function floorTexture(){
+  const { c, g } = makeCanvas(POCK.w, POCK.h, 8);
+  g.fillStyle = POCKET; g.fillRect(0, 0, POCK.w, POCK.h);
+  g.strokeStyle = INK; g.lineWidth = .35; g.setLineDash([1.6, 1.2]); rr(g, 6, 6, POCK.w - 12, POCK.h - 12, 3); g.stroke(); g.setLineDash([]);
+  g.fillStyle = INK; g.textAlign = 'center';
+  g.font = '800 4.4px "JetBrains Mono"'; g.fillText('INSERT TAPE', POCK.w/2, 32);
+  g.font = '400 3.2px "IBM Plex Sans KR"'; g.fillText('테이프를 넣으세요', POCK.w/2, 38.5);
+  g.save(); g.translate(POCK.w/2, 46); g.beginPath(); g.moveTo(-1.6,-3); g.lineTo(1.6,-3); g.lineTo(1.6,1); g.lineTo(4,1); g.lineTo(0,5); g.lineTo(-4,1); g.lineTo(-1.6,1); g.closePath(); g.fill(); g.restore();
+  return toTex(c);
+}
+function buttonTexture(act, on){
+  const { c, g } = makeCanvas(30, 18, 14);
+  const bg = on ? INK : PAPER, fg = on ? PAPER : INK;
+  rr(g, .2, .2, 29.6, 17.6, 2.8); g.fillStyle = bg; g.fill();
+  g.save(); g.translate(11.2, 2.6); g.scale(.42, .42); g.fillStyle = fg; g.fill(new Path2D(ICONS[act === 'play' && on ? 'pause' : act])); g.restore();
+  g.fillStyle = fg; g.font = '800 2.6px "JetBrains Mono"'; g.textAlign = 'center';
+  g.fillText((act === 'play' && on ? 'PAUSE' : act.toUpperCase()).split('').join(' '), 15, 14.6);
+  return toTex(c);
+}
+const lcd = { ...makeCanvas(LCDU.w, LCDU.h, 9), tex:null, sig:'' };
+function drawLCD(s){
+  const g = lcd.g;
+  g.clearRect(0, 0, LCDU.w, LCDU.h);
+  rr(g, 0, 0, LCDU.w, LCDU.h, 1.8); g.fillStyle = INK; g.fill();
+  g.fillStyle = PAPER; g.textBaseline = 'alphabetic';
+  g.font = '800 2.4px "JetBrains Mono"'; g.fillText(s.state, 3, 5.2);
+  g.font = '500 6px "JetBrains Mono"'; g.textAlign = 'right'; g.fillText(s.time, 79, 7.4); g.textAlign = 'left';
+  g.font = '800 3.1px "JetBrains Mono"'; g.fillText(s.title, 3, 12.2, 76);
+  g.font = '500 2.3px "JetBrains Mono"'; g.fillText(s.sub, 3, 15.6, 76);
+  for (let x = 3; x < 79; x += 1.2) g.fillRect(x, 17.9, .25, .25);
+  g.fillRect(3, 17.55, 76 * s.prog, .95);
+  g.font = '800 1.6px "JetBrains Mono"';
+  [s.vuL, s.vuR].forEach((n, r) => {
+    const y = 20 + r * 2;
+    g.fillText(r ? 'R' : 'L', 3, y + 1.15);
+    for (let k = 0; k < 16; k++){ const x = 5.4 + k * 4.6; k < n ? g.fillRect(x, y, 3.8, 1.2) : g.fillRect(x, y + .9, 3.8, .3); }
+  });
+  lcd.tex.needsUpdate = true;
+}
+
+function buildDeck(){
+  const g = new THREE.Group(); scene.add(g);
+  const T = k => ({ kind:k });
+  // body : back slab + front shell (포켓 구멍)
+  const slabGeo = new THREE.ExtrudeGeometry(rrShape(DW, DH, 10), { depth:DD - SHELL, bevelEnabled:false, curveSegments:10 });
+  slabGeo.translate(0, 0, -DD);
+  const shellShape = rrShape(DW, DH, 10); shellShape.holes.push(rrHole(POCK.w, POCK.h, 4, 0, POCK.y));
+  const shellGeo = new THREE.ExtrudeGeometry(shellShape, { depth:SHELL, bevelEnabled:false, curveSegments:10 });
+  shellGeo.translate(0, 0, -SHELL);
+  const slab = new THREE.Mesh(slabGeo, htMat({ base:.96 })), shell = new THREE.Mesh(shellGeo, htMat({ base:.97 }));
+  slab.userData = shell.userData = T('deck');
+  g.add(slab, edges(slabGeo), shell, edges(shellGeo)); hits.push(slab, shell);
+  // pocket floor
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(POCK.w, POCK.h), htMat({ map: floorTexture() }));
+  floor.position.set(0, POCK.y, -SHELL + .05); g.add(floor);
+  // top strip + LED
+  const strip = new THREE.Mesh(new THREE.PlaneGeometry(132, 7), htMat({ map: stripTexture(), flat:1 }));
+  strip.position.set(0, 69.8, .05); g.add(strip);
+  const led = new THREE.Mesh(new THREE.CircleGeometry(1.7, 24), htMat({ base:.98, flat:1 }));
+  led.position.set(-69.5, 69.8, .12); g.add(led);
+  const ledRing = new THREE.Mesh(new THREE.RingGeometry(1.7, 2.2, 24), inkMat); ledRing.position.copy(led.position); g.add(ledRing);
+  // door (힌지로 열리는 카세트 홀더)
+  const pivot = new THREE.Group(); pivot.position.set(0, HINGE_Y, .3); g.add(pivot);
+  const doorShape = rrShape(104, 67, 4, 0, 34.5); doorShape.holes.push(rrHole(90, 45, 3, 0, 41));
+  const doorGeo = new THREE.ExtrudeGeometry(doorShape, { depth:2.4, bevelEnabled:false, curveSegments:6 });
+  const door = new THREE.Mesh(doorGeo, htMat({ base:.95 })); door.userData = T('deck');
+  pivot.add(door, edges(doorGeo)); hits.push(door);
+  const gripGeo = new THREE.BoxGeometry(18, 2.6, 1.8); const grip = new THREE.Mesh(gripGeo, htMat({ base:.9 }));
+  grip.position.set(0, 65.5, 3.3); pivot.add(grip); const ge = edges(gripGeo); ge.position.copy(grip.position); pivot.add(ge);
+  const doorTxt = new THREE.Mesh(new THREE.PlaneGeometry(40, 3), htMat({ map: (() => {
+    const { c, g:x } = makeCanvas(40, 3, 14); x.fillStyle = PAPER; x.fillRect(0,0,40,3); x.fillStyle = INK; x.font = '800 2px "JetBrains Mono"'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('◀ OPEN · HT-01 · AUTO REVERSE ▶', 20, 1.6); return toTex(c);
+  })(), flat:1 }));
+  doorTxt.position.set(0, 10, 2.45); pivot.add(doorTxt);
+  [-40, 40].forEach(x => { const hg = new THREE.CylinderGeometry(1.4, 1.4, 12, 14); hg.rotateZ(Math.PI/2); const h = new THREE.Mesh(hg, htMat({ base:.85 })); h.position.set(x, 0, .4); pivot.add(h); const he = edges(hg, 30); he.position.copy(h.position); pivot.add(he); });
+  const holder = new THREE.Object3D(); holder.position.set(0, 34.5, -8.3); pivot.add(holder);
+  // LCD
+  const bezGeo = (() => { const s = rrShape(LCDU.w + 6, LCDU.h + 6, 4); s.holes.push(rrHole(LCDU.w, LCDU.h, 2, 0, 0)); return new THREE.ExtrudeGeometry(s, { depth:1.6, bevelEnabled:false, curveSegments:6 }); })();
+  const bez = new THREE.Mesh(bezGeo, htMat({ base:.93 })); bez.position.set(LCDU.x, LCDU.y, 0); g.add(bez);
+  const be = edges(bezGeo); be.position.copy(bez.position); g.add(be);
+  lcd.tex = toTex(lcd.c);
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(LCDU.w, LCDU.h), htMat({ map: lcd.tex, flat:1 }));
+  screen.position.set(LCDU.x, LCDU.y, .1); g.add(screen);
+  // speaker (하프톤 점 = 스피커 그릴)
+  const ringGeo = (() => { const s = new THREE.Shape(); s.absarc(0, 0, SPK.r + 2, 0, Math.PI * 2); const h = new THREE.Path(); h.absarc(0, 0, SPK.r, 0, Math.PI * 2, true); s.holes.push(h); return new THREE.ExtrudeGeometry(s, { depth:1.8, bevelEnabled:false, curveSegments:40 }); })();
+  const ring = new THREE.Mesh(ringGeo, htMat({ base:.93 })); ring.position.set(SPK.x, SPK.y, 0); g.add(ring);
+  const re = edges(ringGeo, 30); re.position.copy(ring.position); g.add(re);
+  const cone = new THREE.Mesh(new THREE.CircleGeometry(SPK.r, 48), htMat({ base:.58 })); cone.position.set(SPK.x, SPK.y, .5); g.add(cone);
+  const cap = new THREE.Mesh(new THREE.CircleGeometry(4.2, 32), htMat({ base:.3 })); cap.position.set(SPK.x, SPK.y, .8); g.add(cap);
+  // buttons
+  const buttons = {};
+  BTN_ACTS.forEach((act, k) => {
+    const bg = new THREE.Group(); bg.position.set(-51 + k * 34, -57, 0); g.add(bg);
+    const geo = new THREE.ExtrudeGeometry(rrShape(30, 18, 3), { depth:6, bevelEnabled:false, curveSegments:5 }); geo.translate(0, 0, -1);
+    const m = new THREE.Mesh(geo, htMat({ base:.95 })); m.userData = { kind:'btn', act };
+    const tex = buttonTexture(act, false), texOn = buttonTexture(act, true);
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(30, 18), htMat({ map: tex, flat:1 })); face.position.z = 5.06; face.userData = m.userData;
+    bg.add(m, edges(geo), face); hits.push(m, face);
+    buttons[act] = { grp:bg, face, tex, texOn, sp:{ x:0, v:0 }, x:-51 + k * 34, lit:0 };
+  });
+  const well = new THREE.Mesh(new THREE.PlaneGeometry(140, .5), inkMat); well.position.set(0, -68.5, .05); g.add(well);
+  // top : knob (사운드) + jack
+  const knob = new THREE.Group(); knob.position.set(52, DH/2 + 3, -18); g.add(knob);
+  const kg = new THREE.CylinderGeometry(7, 7, 6, 28); const km = new THREE.Mesh(kg, htMat({ base:.92 })); km.userData = T('knob');
+  knob.add(km, edges(kg, 10)); hits.push(km);
+  const mark = new THREE.Mesh(new THREE.BoxGeometry(1.4, .3, 5.4), inkMat); mark.position.set(0, 3.05, -3.4); knob.add(mark);
+  const jack = new THREE.Mesh(new THREE.CircleGeometry(2.4, 20), inkMat); jack.rotation.x = -Math.PI/2; jack.position.set(-50, DH/2 + .05, -18); g.add(jack);
+  const jr = new THREE.Mesh(new THREE.RingGeometry(2.4, 3.6, 20), htMat({ base:.85 })); jr.rotation.x = -Math.PI/2; jr.position.set(-50, DH/2 + .04, -18); g.add(jr);
+  // shadow
+  const shadow = new THREE.Mesh(new THREE.ShapeGeometry(rrShape(DW, DH, 10), 8), htMat({ base:.62, lit:0 }));
+  shadow.position.z = -DD - 16; g.add(shadow);
+  return { group:g, pivot, holder, led, cone, cap, buttons, knob, shadow,
+           door:{ x:0, from:0, to:0, t0:0 }, kick:{ x:{x:0,v:0}, y:{x:0,v:0}, s:{x:0,v:0} }, knobAng:0 };
+}
+
+/* =========================================================
+   6. LAYOUT (DOM 슬롯 → 3D 좌표)
+   ========================================================= */
+const app = $('#app'), stageEl = $('#stage'), playerEl = $('#player'), linesSvg = $('#lines');
+const L = { W:0, H:0, anchors:[], deck:{ x:0, y:0, s:1, rect:null }, sIdle:200, nodes:[] };
+function measure(){
+  const Wp = canvas.clientWidth, Hp = canvas.clientHeight;
+  if (!Wp || !Hp) return;
+  L.W = Wp; L.H = Hp;
+  renderer.setSize(Wp, Hp, false);
+  camera.left = -Wp/2; camera.right = Wp/2; camera.top = Hp/2; camera.bottom = -Hp/2; camera.updateProjectionMatrix();
+  const mob = isMobile();
+  const st = stageEl.getBoundingClientRect();
+  L.sIdle = Math.min(st.width * (mob ? .4 : .36), st.height * (mob ? .55 : .38));
+  L.anchors = $$('.anchor').map(a => { const r = a.getBoundingClientRect(); return { x: r.left + 1 - Wp/2, y: Hp/2 - (r.top + 1) }; });
+  const p = playerEl.getBoundingClientRect();
+  L.deck = { x: p.left + p.width/2 - Wp/2, y: Hp/2 - (p.top + p.height/2) - (mob ? 2 : 4),
+             s: Math.min(p.width * (mob ? .74 : .82) / DW, p.height * (mob ? .76 : .8) / DH), rect:p };
+  L.nodes = $$('.tag-node').map(n => { const r = n.getBoundingClientRect(); return { x: r.left + r.width/2, y: r.top + r.height/2 }; });
+  U.uCell.value = mob ? 3.3 : 4.2;
+  clampPop();
+}
+
+/* =========================================================
+   7. STATE & PLAYER LOGIC
+   ========================================================= */
+const IDLE_ROT = [ { x:-.8, y:.06, z:.5 }, { x:-.8, y:-.04, z:.46 }, { x:-.8, y:.08, z:.54 }, { x:-.8, y:-.06, z:.48 } ];
+let tapes = [], deck = null;
+let loaded = null, playing = false, paused = false, T = 0, beatPh = 0, hubBoost = 0;
+let hover = null, overDeck = false, soundLvl = 0, pendingPlay = false;
+const ptr = { x:0, y:0, nx:0, ny:0, vx:0, vy:0, tape:null, sx:0, sy:0, moved:false };
+const tags = $$('.tag');
+const curTrack = () => !loaded ? 0 : usesSong(loaded) ? loaded.tr : Math.min(3, Math.floor(loaded.progress * 4));
+
+function refreshUI(){
+  tags.forEach((el, i) => el.classList.toggle('loaded', !!loaded && loaded.i === i));
+  if (deck) deck.buttons.play.face.material.uniforms.uMap.value = playing ? deck.buttons.play.texOn : deck.buttons.play.tex;
+}
+function lcdState(){
+  const docked = loaded && loaded.state === 'dock' && loaded.clunked;
+  const p = loaded ? dispFrac(loaded) : 0, tr = curTrack();
+  return {
+    state: !loaded ? '— EMPTY' : !docked ? '… LOADING' : playing ? '▶ PLAY' : paused ? 'II PAUSE' : '■ STOP',
+    time: fmt(p * (loaded ? tapeDur(loaded) : 0)),
+    title: loaded ? `TAPE ${loaded.id} · ${loaded.name}` : 'NO TAPE',
+    sub: !loaded ? 'SELECT A TAPE TO BEGIN' : usesSong(loaded) ? `${String(tr + 1).padStart(2,'0')} ${curSong(loaded).title}` : `${String(tr + 1).padStart(2,'0')} ${loaded.tracks[tr].toUpperCase()}`,
+    prog: p, vuL: Math.round(clamp(vu[0],0,1) * 16), vuR: Math.round(clamp(vu[1],0,1) * 16),
+  };
+}
+
+const snapshot = tp => ({ x:tp.p.x, y:tp.p.y, z:tp.p.z, q:tp.q.clone(), s:tp.s, l:tp.lift });
+function insert(tp){
+  if (loaded === tp) return;
+  let delay = 0;
+  if (loaded){ eject(true); delay = TL.door + TL.ins * .42; }            // 기존 테이프가 슬롯을 빠져나간 뒤 진입
+  closePop();
+  tp.from = snapshot(tp);
+  tp.state = 'insert'; tp.t0 = T; tp.delay = delay; tp.clunked = false; loaded = tp; pendingPlay = false;
+  if (usesSong(tp)){ Song.load(curSong(tp).url); probeDurs(tp); }      // 날아가는 동안 미리 버퍼링
+  Audio.sfx('btn'); refreshUI();
+}
+function onDock(tp){
+  tp.clunked = true;
+  Audio.sfx('insert');
+  refreshUI();
+  pendingPlay = false;
+  setTimeout(() => { if (loaded === tp && !playing) play(); }, 120);       // 테이프 장착 → 자동 재생 + 팝업
+}
+function play(){
+  if (!loaded){ openPop('notape'); return; }
+  if (loaded.state !== 'dock' || !loaded.clunked){ pendingPlay = true; return; }   // 장착 중이면 장착 후 재생
+  if (playing){ pause(); return; }
+  const fresh = !paused;
+  if (loaded.progress >= .999){ loaded.progress = 0; loaded.tr = 0; loaded.frac = 0; hubBoost = -40; }
+  playing = true; paused = false;
+  const tp = loaded;
+  if (usesSong(tp)){
+    Audio.start(tp, null, false);
+    startSong(tp);
+  } else Audio.start(tp, () => (loaded === tp ? curTrack() : 0));
+  refreshUI();
+  if (fresh && popKind !== 'now') openPop('now');
+}
+function pause(){ if (!playing) return; playing = false; paused = true; Audio.stop(); Song.pause(); refreshUI(); }
+function stop(){ const was = playing; playing = false; paused = false; if (was) Audio.stop(); Song.pause(); refreshUI(); }
+function onSongEnd(){                                                       // 다음 곡으로 · 마지막 곡이면 정지
+  const tp = loaded; if (!usesSong(tp)) return;
+  const n = nextPlayable(tp, tp.tr + 1);
+  if (n >= 0){ tp.tr = n; tp.frac = 0; syncProg(tp); startSong(tp); }
+  else { tp.frac = 1; tp.progress = 1; stop(); }
+}
+function onSongFail(url){                                                  // 실패한 곡은 건너뛰고, 전부 실패면 신스로 대체
+  const tp = loaded; if (!hasList(tp) || curSong(tp).url !== url) return;
+  if (usesSong(tp)){
+    let n = nextPlayable(tp, tp.tr + 1); if (n < 0) n = nextPlayable(tp, 0);
+    tp.tr = n; tp.frac = 0; syncProg(tp);
+    if (playing) startSong(tp);
+  } else if (playing) Audio.start(tp, () => (loaded === tp ? curTrack() : 0));
+  if (popKind === 'now') openPop('now');
+}
+function onSongBlocked(err){                                                // 브라우저 자동재생 차단 → ▶ 대기
+  if (!err || err.name !== 'NotAllowedError' || !playing) return;
+  playing = false; paused = true; Audio.stop(true); Song.wantPlay = false; refreshUI();
+}
+function eject(silent){
+  if (!loaded){ if (!silent) openPop('notape'); return; }
+  if (playing){ playing = false; Audio.stop(true); }
+  Song.pause(); paused = false; pendingPlay = false;
+  const tp = loaded; loaded = null;
+  if (tp.state === 'dock'){ tp.state = 'eject'; tp.t0 = T; }               // 도어와 함께 열린 뒤 위로 빠짐
+  else { tp.from = snapshot(tp); tp.state = 'return'; tp.t0 = T; }       // 삽입 도중이면 바로 복귀
+  Audio.sfx('eject'); refreshUI();
+}
+function seekTo(frac){                                                    // 0~1 위치로 이동
+  if (!loaded) return;
+  frac = clamp(frac, 0, .999);
+  hubBoost = (frac > dispFrac(loaded) ? 1 : -1) * 34;
+  if (usesSong(loaded)){ loaded.frac = frac; syncProg(loaded); Song.seek(frac); }
+  else loaded.progress = frac;
+}
+function seekTrack(k){
+  if (!loaded) return;
+  if (usesSong(loaded)){                                                    // 재생 목록 곡 선택
+    const tp = loaded; k = clamp(k, 0, tp.list.length - 1);
+    hubBoost = (k >= tp.tr ? 1 : -1) * 34;
+    tp.tr = k; tp.frac = 0; syncProg(tp);
+    if (playing) startSong(tp); else Song.load(curSong(tp).url);
+    Audio.sfx('btn'); return;
+  }
+  k = clamp(k, 0, 3);
+  const before = loaded.progress;
+  loaded.progress = k / 4 + .0005;
+  hubBoost = (loaded.progress > before ? 1 : -1) * 34;
+  Audio.sfx('btn');
+}
+function pressBtn(act){
+  const b = deck.buttons[act];
+  b.sp.x = -4.2; b.sp.v = 0; b.lit = .22;
+  deck.kick.y.v += (b.x / 75) * .5; deck.kick.x.v += .35;                 // 누른 위치로 본체가 살짝 기울어짐
+  Audio.sfx('btn');
+  if (act === 'play') play();
+  if (act === 'stop'){ if (!loaded) openPop('notape'); else stop(); }
+  if (act === 'eject') eject();
+  if (act === 'info') openPop('info');
+}
+const sndBtn = $('#snd');
+function toggleSound(){
+  Audio.setOn(!Audio.on);
+  sndBtn.classList.toggle('on', Audio.on); $('#sndTxt').textContent = Audio.on ? 'SOUND ON' : 'SOUND OFF';
+}
+sndBtn.addEventListener('click', toggleSound);
+
+/* =========================================================
+   8. POPUP (드래그 가능, 뷰포트 밖으로 나가지 않음)
+   ========================================================= */
+const popLayer = $('#popLayer');
+let popKind = null, popEl = null;
+const X_ICO = '<svg viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" fill="none"/></svg>';
+const svgI = d => `<svg viewBox="0 0 18 18"><path d="${d}"/></svg>`;
+const PREV = 'M3 3h2.4v12H3zM16 3v12L6 9z', NEXT = 'M12.6 3H15v12h-2.4zM2 3v12l10-6z';
+function popHTML(kind){
+  if (kind === 'now'){
+    const t = loaded;
+    return `<div class="pop-head"><span>▶ NOW PLAYING</span><span class="grip"></span><button class="pop-x" aria-label="close">${X_ICO}</button></div>
+    <div class="pop-body">
+      <div class="np-top">
+        <div class="np-reels" data-np="reels"><i></i><i></i></div>
+        <div class="np-info"><div class="np-letter">TAPE ${t.id} · ${usesSong(t) ? t.name : t.side + ' · ' + t.len}</div><div class="np-name" data-np="name">${usesSong(t) ? curSong(t).title : t.name}</div>
+        <div class="np-time"><span data-np="time">00:00</span> / <span data-np="total">--:--</span></div></div>
+      </div>
+      <div class="np-bar" data-np="seek"><i data-np="bar"></i></div>
+      <ol class="np-list">${usesSong(t)
+        ? t.list.map((x,k) => `<li data-k="${k}"><span>${String(k+1).padStart(2,'0')}</span><b>${x.title}</b><em data-np-dur="${k}">--:--</em></li>`).join('')
+        : t.tracks.map((n,k) => `<li data-k="${k}"><span>${String(k+1).padStart(2,'0')}</span><b>${n}</b><em>${fmt(TRACK_LEN)}</em></li>`).join('')}</ol>
+      <div class="np-ctrl"><button data-np-act="prev" aria-label="previous">${svgI(PREV)}</button><button class="main" data-np-act="toggle" aria-label="play/pause"><svg viewBox="0 0 18 18"><path data-np="ico" d="${playing ? ICONS.pause : ICONS.play}"/></svg></button><button data-np-act="next" aria-label="next">${svgI(NEXT)}</button></div>
+    </div>`;
+  }
+  if (kind === 'info'){
+    return `<div class="pop-head"><span>i DECK SPEC</span><span class="grip"></span><button class="pop-x" aria-label="close">${X_ICO}</button></div>
+    <div class="pop-body">
+      <div class="spec-hero"><b>HT-01</b><span>ANALOG<br>CASSETTE DECK</span></div>
+      <div class="spec">
+        <div><small>TAPE TYPE</small><p>TYPE I · NORMAL</p></div>
+        <div><small>FREQ RESPONSE</small><p>30 Hz – 16 kHz</p></div>
+        <div><small>WOW &amp; FLUTTER</small><p>0.08 % WRMS</p></div>
+        <div><small>MOTOR</small><p>DC SERVO</p></div>
+      </div>
+      <ul class="howto">
+        <li><b>01</b>테이프를 탭하거나 플레이어로 끌어다 놓기</li>
+        <li><b>02</b>넣으면 자동 재생 · ▶ 버튼이나 장착된 테이프 탭으로 재생/정지</li>
+        <li><b>03</b>⏏ 버튼 또는 플레이어 밖으로 끌어내면 배출</li>
+        <li><b>04</b>상단 노브를 누르면 사운드 ON/OFF</li>
+      </ul>
+    </div>`;
+  }
+  return `<div class="pop-head"><span>! NOTICE</span><span class="grip"></span><button class="pop-x" aria-label="close">${X_ICO}</button></div>
+    <div class="pop-body">
+      <div class="notice"><div class="big">!</div><p>테이프가 없습니다.<br>먼저 테이프를 넣어 주세요.<small>NO TAPE IN DECK</small></p></div>
+      <button class="pop-cta" data-np-act="pick">SELECT TAPE</button>
+    </div>`;
+}
+function openPop(kind){
+  if (kind === 'now' && !loaded) kind = 'notape';
+  popLayer.classList.remove('closing');
+  popLayer.innerHTML = `<div class="pop-back"></div><div class="pop" role="dialog" aria-modal="true">${popHTML(kind)}</div>`;
+  popLayer.classList.add('open');
+  popKind = kind; popEl = $('.pop', popLayer);
+  const vw = window.innerWidth, vh = app.clientHeight;
+  popEl.style.left = Math.max(12, (vw - popEl.offsetWidth) / 2) + 'px';
+  popEl.style.top  = Math.max(12, (vh - popEl.offsetHeight) / 2) + 'px';
+  clampPop();
+  $('.pop-back', popLayer).addEventListener('click', closePop);
+  $('.pop-x', popLayer).addEventListener('click', closePop);
+  bindPopDrag($('.pop-head', popEl));
+  popEl.addEventListener('click', e => {
+    unlockAudio();
+    const li = e.target.closest('.np-list li'); if (li){ seekTrack(+li.dataset.k); if (!playing) play(); return; }
+    const a = e.target.closest('[data-np-act]'); if (a){
+      const act = a.dataset.npAct;
+      if (act === 'toggle') play();
+      if (act === 'prev' && loaded){                                        // 3초 이상 재생됐으면 처음으로, 아니면 이전 곡
+        const tr = curTrack(), pos = usesSong(loaded) ? loaded.frac * tapeDur(loaded) : (loaded.progress * 4 - tr) * TRACK_LEN;
+        seekTrack(pos > 3 ? tr : tr - 1);
+      }
+      if (act === 'next' && loaded) seekTrack(curTrack() + 1);
+      if (act === 'pick'){ closePop(); tapes.forEach(o => { if (o.state === 'idle') o.jump = .7; }); }
+    }
+    const sk = e.target.closest('[data-np="seek"]'); if (sk && loaded){
+      const r = sk.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width);
+    }
+  });
+  npSig = '';
+}
+function closePop(){
+  if (!popKind) return;
+  popKind = null;
+  popLayer.classList.add('closing');
+  setTimeout(() => { if (!popKind){ popLayer.classList.remove('open', 'closing'); popLayer.innerHTML = ''; popEl = null; } }, 180);
+}
+function clampPop(){
+  if (!popEl) return;
+  const vw = window.innerWidth, vh = app.clientHeight, w = popEl.offsetWidth, h = popEl.offsetHeight;
+  popEl.style.left = clamp(parseFloat(popEl.style.left) || 0, 8, Math.max(8, vw - w - 8)) + 'px';
+  popEl.style.top  = clamp(parseFloat(popEl.style.top)  || 0, 8, Math.max(8, vh - h - 8)) + 'px';
+}
+function bindPopDrag(head){
+  let sx, sy, ox, oy, on = false;
+  head.addEventListener('pointerdown', e => {
+    if (e.target.closest('.pop-x')) return;
+    on = true; sx = e.clientX; sy = e.clientY; ox = parseFloat(popEl.style.left); oy = parseFloat(popEl.style.top);
+    head.setPointerCapture(e.pointerId);
+  });
+  head.addEventListener('pointermove', e => {
+    if (!on) return;
+    popEl.style.left = (ox + e.clientX - sx) + 'px'; popEl.style.top = (oy + e.clientY - sy) + 'px'; clampPop();
+  });
+  const end = () => { on = false; };
+  head.addEventListener('pointerup', end); head.addEventListener('pointercancel', end);
+}
+let npSig = '';
+function npTick(){
+  if (popKind !== 'now' || !popEl || !loaded) return;
+  const p = dispFrac(loaded), tr = curTrack(), dur = tapeDur(loaded);
+  $('[data-np="bar"]', popEl).style.width = (p * 100) + '%';
+  const sig = `${fmt(p * dur)}|${tr}|${playing}|${dur}`;
+  if (sig === npSig) return; npSig = sig;
+  $('[data-np="time"]', popEl).textContent = fmt(p * dur);
+  $('[data-np="total"]', popEl).textContent = dur ? fmt(dur) : '--:--';
+  if (usesSong(loaded)){
+    $('[data-np="name"]', popEl).textContent = curSong(loaded).title;
+    $$('[data-np-dur]', popEl).forEach(em => { const d = Song.durs[loaded.list[+em.dataset.npDur].url]; em.textContent = d ? fmt(d) : '--:--'; });
+  }
+  $$('.np-list li', popEl).forEach((li, k) => li.classList.toggle('on', k === tr));
+  $('[data-np="ico"]', popEl).setAttribute('d', playing ? ICONS.pause : ICONS.play);
+  $('[data-np="reels"]', popEl).classList.toggle('spin', playing);
+}
+
+/* =========================================================
+   9. POINTER (raycast → 테이프 드래그 / 3D 버튼 클릭)
+   ========================================================= */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function pick(cx, cy){
+  ndc.set(cx / L.W * 2 - 1, -(cy / L.H) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const h = ray.intersectObjects(hits, false);
+  return h.length ? h[0].object.userData : null;
+}
+function setPtr(e){
+  const nx = e.clientX - L.W/2, ny = L.H/2 - e.clientY;
+  ptr.vx = ptr.vx * .6 + (nx - ptr.x) * .4; ptr.vy = ptr.vy * .6 + (ny - ptr.y) * .4;
+  ptr.x = nx; ptr.y = ny;
+  ptr.nx = clamp(e.clientX / L.W * 2 - 1, -1, 1); ptr.ny = clamp(e.clientY / L.H * 2 - 1, -1, 1);
+}
+function inDeck(cx, cy){ const r = L.deck.rect; if (!r) return false; return cx > r.left && cx < r.right && cy > r.top && cy < r.bottom; }
+const blocked = e => e.target.closest && e.target.closest('.snd, .pop-layer');
+
+window.addEventListener('pointerdown', e => {
+  if (blocked(e) || !deck) return;
+  setPtr(e);
+  const h = pick(e.clientX, e.clientY);
+  if (!h) return;
+  unlockAudio(h.kind === 'tape' ? tapes[h.idx] : null);
+  if (h.kind === 'btn'){ pressBtn(h.act); e.preventDefault(); return; }
+  if (h.kind === 'knob'){ toggleSound(); deck.knobAng += Audio.on ? 1.6 : -1.6; Audio.sfx('btn'); return; }
+  if (h.kind !== 'tape') return;
+  const tp = tapes[h.idx];
+  if (tp.state === 'insert' || tp.state === 'eject' || tp.state === 'return') return;
+  ptr.tape = tp; ptr.moved = false; ptr.sx = e.clientX; ptr.sy = e.clientY;
+  tp.off = { x: tp.p.x - ptr.x, y: tp.p.y - ptr.y };
+  e.preventDefault();
+});
+window.addEventListener('pointermove', e => {
+  setPtr(e);
+  const tp = ptr.tape;
+  if (tp){
+    if (!ptr.moved && Math.hypot(e.clientX - ptr.sx, e.clientY - ptr.sy) > 6){
+      ptr.moved = true;
+      if (tp === loaded){                         // 플레이어에서 끌어내기 = 배출
+        if (playing){ playing = false; Audio.stop(true); }
+        Song.pause(); paused = false; loaded = null; Audio.sfx('eject'); refreshUI();
+      }
+      tp.state = 'drag'; document.body.style.cursor = 'grabbing';
+    }
+    if (ptr.moved) overDeck = inDeck(e.clientX, e.clientY);
+    return;
+  }
+  if (blocked(e) || !deck){ hover = null; return; }
+  hover = pick(e.clientX, e.clientY);
+  document.body.style.cursor = !hover || hover.kind === 'deck' ? '' : hover.kind === 'tape' ? 'grab' : 'pointer';
+  tags.forEach((el, i) => el.classList.toggle('hot', !!hover && hover.kind === 'tape' && hover.idx === i));
+});
+function endDrag(){
+  const tp = ptr.tape; if (!tp) return;
+  ptr.tape = null; document.body.style.cursor = '';
+  if (!ptr.moved){
+    if (tp.state === 'dock') play(); else insert(tp);
+  } else {
+    if (overDeck) insert(tp); else { tp.state = 'idle'; Audio.sfx('btn'); }
+  }
+  overDeck = false;
+}
+window.addEventListener('pointerup', endDrag);
+window.addEventListener('pointercancel', endDrag);
+window.addEventListener('keydown', e => {
+  if (!deck) return;
+  if (['1','2','3','4'].includes(e.key)) unlockAudio(tapes[+e.key - 1]);
+  else if (e.code === 'Space' || e.key === 'e' || e.key === 'E') unlockAudio();
+  if (e.code === 'Space'){ e.preventDefault(); pressBtn('play'); }
+  if (e.key === 'Escape') closePop();
+  if (e.key === 'e' || e.key === 'E') pressBtn('eject');
+  if (['1','2','3','4'].includes(e.key)) insert(tapes[+e.key - 1]);
+});
+
+/* =========================================================
+   10. LEADER LINES (desktop)
+   ========================================================= */
+const NS = 'http://www.w3.org/2000/svg';
+const lineEls = TAPES.map(() => {
+  const g = document.createElementNS(NS, 'g'), l = document.createElementNS(NS, 'line'), r = document.createElementNS(NS, 'rect');
+  r.setAttribute('width', 8); r.setAttribute('height', 8); g.append(l, r); linesSvg.append(g); return { g, l, r };
+});
+const v3 = new THREE.Vector3();
+function project(obj, x, y, z){
+  v3.set(x, y, z); obj.localToWorld(v3); v3.project(camera);
+  return { x: (v3.x + 1) / 2 * L.W, y: (1 - v3.y) / 2 * L.H };
+}
+function linesTick(){
+  if (isMobile()) return;
+  tapes.forEach((tp, i) => {
+    const n = L.nodes[i]; if (!n) return;
+    const left = n.x < L.W / 2 && n.x < (tp.p.x + L.W / 2);
+    const p = project(tp.group, left ? -40 : 40, 22, D/2);
+    const E = lineEls[i];
+    E.l.setAttribute('x1', n.x); E.l.setAttribute('y1', n.y); E.l.setAttribute('x2', p.x); E.l.setAttribute('y2', p.y);
+    E.r.setAttribute('x', p.x - 4); E.r.setAttribute('y', p.y - 4);
+    E.r.style.fill = hover && hover.kind === 'tape' && hover.idx === i ? INK : '';
+    E.g.style.opacity = tp.state === 'idle' ? 1 : 0;
+  });
+}
+
+/* =========================================================
+   11. MAIN LOOP
+   ========================================================= */
+const vu = [0, 0];
+const R0 = 5.6, R1 = 11.6;
+const tmpE = new THREE.Euler(), tmpQ = new THREE.Quaternion(), tmpV = new THREE.Vector3(), hQ = new THREE.Quaternion(), hP = new THREE.Vector3();
+const IDLE_Q = new THREE.Quaternion();
+
+/* 삽입/배출 타임라인 (초) — 하나의 연속 동작으로 이어짐 */
+const TL = { door:.42, ins:1.25, back:.7 };
+const SLOT_TOP = [0, 72, 0];                       // 열린 도어 위, 홀더 슬롯 입구
+const SPLIT = .66;                                 // 경로 중 '비행' 구간 비율 (나머지는 슬롯 슬라이드)
+const smooth = t => t * t * (3 - 2 * t);
+const pS = new THREE.Vector3(), pH = new THREE.Vector3(), qH = new THREE.Quaternion();
+/* 하나의 연속 경로 : 출발점 → (곡선 비행) → 슬롯 입구 → (직선 슬라이드) → 홀더
+   두 구간의 접점에서 속도·방향이 이어지도록 Hermite 곡선 사용 → 멈칫거림 없음 */
+function pathPose(tp, b, P0, q0, s0, l0){
+  holderPose(SLOT_TOP); pS.copy(hP); holderPose(); pH.copy(hP); qH.copy(hQ);
+  const sDock = W * L.deck.s;
+  if (b < SPLIT){
+    const t = b / SPLIT, t2 = t * t, t3 = t2 * t;
+    const h00 = 2*t3 - 3*t2 + 1, h10 = t3 - 2*t2 + t, h01 = -2*t3 + 3*t2, h11 = t3 - t2;
+    const k1 = SPLIT / (1 - SPLIT), e = smooth(t);
+    const P = c => h00 * P0[c] + h10 * (pS[c] - P0[c]) + h01 * pS[c] + h11 * (pH[c] - pS[c]) * k1;
+    tmpQ.copy(q0).slerp(qH, e);
+    setPose(tp, P('x'), P('y'), P('z') + 320 * Math.pow(Math.sin(Math.PI * t), 2), tmpQ, lerp(s0, sDock, e), lerp(l0, .5, e));
+  } else {
+    const t = (b - SPLIT) / (1 - SPLIT);
+    setPose(tp, lerp(pS.x, pH.x, t), lerp(pS.y, pH.y, t), lerp(pS.z, pH.z, t), qH, sDock, .5);
+  }
+}
+const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+const lerp = (a, b, t) => a + (b - a) * t;
+const pA = new THREE.Vector3(), qI = new THREE.Quaternion();
+
+function updateDeck(dt){
+  const mob = isMobile();
+  const busy = tapes.some(t => t.state === 'insert' || (t.state === 'eject' && T - t.t0 < TL.door + TL.ins * .6) || (t.state === 'return' && T - t.t0 < .3));
+  const doorTarget = busy || (ptr.tape && ptr.moved && overDeck) ? 1 : 0;
+  // door : 이징 트윈 (튕김 없음)
+  const dr = deck.door;
+  if (doorTarget !== dr.to){ dr.from = dr.x; dr.to = doorTarget; dr.t0 = T; }
+  dr.x = lerp(dr.from, dr.to, easeIO(clamp((T - dr.t0) / TL.door, 0, 1)));
+  deck.pivot.rotation.x = dr.x;
+  // body motion
+  spring(deck.kick.x, dt); spring(deck.kick.y, dt);
+  const lvl = soundLvl;
+  const rx = (mob ? -.16 : -.2) + ptr.ny * .06 + deck.kick.x.x * .06;
+  const ry = (mob ? .16 : .3) + ptr.nx * .1 + deck.kick.y.x * .08;
+  deck.bob = damp(deck.bob || 0, playing ? 0 : 1, 4, dt);          // 재생 중엔 부유 모션 정지
+  const g = deck.group;
+  g.position.set(L.deck.x, L.deck.y + Math.sin(T * 1.1) * 2.5 * deck.bob, 0);
+  g.rotation.set(rx, ry, 0);
+  g.scale.setScalar(L.deck.s);
+  // buttons
+  Object.values(deck.buttons).forEach(b => {
+    spring(b.sp, dt, 380, 20);
+    b.grp.position.z = b.sp.x;
+    b.lit = Math.max(0, b.lit - dt);
+    if (b !== deck.buttons.play) b.face.material.uniforms.uMap.value = b.lit > 0 ? b.texOn : b.tex;
+  });
+  // LED, speaker (하프톤 톤이 음량에 따라 맥동)
+  const docked = loaded && loaded.state === 'dock' && loaded.clunked;
+  deck.led.material.uniforms.uBase.value = docked && (!playing || Math.sin(T * 8) > -.2) ? 0 : .98;
+  deck.cone.material.uniforms.uTone.value = lvl * .4;
+  deck.cap.material.uniforms.uTone.value = lvl * .3;
+  deck.cone.position.z = .5 + lvl * .8; deck.cap.position.z = .8 + lvl * 1.4;
+  deck.knob.rotation.y = damp(deck.knob.rotation.y, deck.knobAng, 10, dt);
+  g.updateMatrixWorld(true);
+}
+
+function holderPose(off){
+  deck.holder.getWorldQuaternion(hQ);
+  if (off){ tmpV.set(off[0], off[1], off[2]); deck.holder.localToWorld(tmpV); hP.copy(tmpV); }
+  else deck.holder.getWorldPosition(hP);
+}
+// 대기 위치 목표 (qI 에 회전 저장)
+function idleTarget(tp){
+  const a = L.anchors[tp.i] || { x:0, y:0 }, ir = IDLE_ROT[tp.i];
+  const bob = Math.sin(T * 1.2 + tp.i * 2.1) * 3;
+  const beat = playing ? Math.pow(Math.max(0, Math.sin(beatPh + tp.i * .8)), 8) * 7 : 0;
+  const jmp = Math.abs(Math.sin(tp.jump * Math.PI * 3)) * tp.jump * 30;
+  tmpE.set(ir.x + ptr.ny * .12 * tp.hover - beat * .006, ir.y + ptr.nx * .18 * tp.hover, ir.z + Math.sin(T * .7 + tp.i) * .025 + jmp * .002);
+  qI.setFromEuler(tmpE);
+  return { x: a.x + tp.push.x, y: a.y + tp.push.y + bob + beat + jmp, z: -500 + tp.i * 130 + tp.hover * 250,
+           s: L.sIdle * (1 + tp.hover * .05), l: 6 + tp.hover * 14 + jmp * .4 };
+}
+function setPose(tp, x, y, z, q, s, l){ tp.p.x = x; tp.p.y = y; tp.p.z = z; tp.q.copy(q); tp.s = s; tp.lift = l; }
+
+function updateTape(tp, dt){
+  const isHover = hover && hover.kind === 'tape' && hover.idx === tp.i && tp.state === 'idle' && !ptr.tape;
+  tp.hover = damp(tp.hover, isHover ? 1 : 0, 10, dt);
+  tp.jump = Math.max(0, tp.jump - dt * 1.5);
+  // 상호작용 : 움직이는 테이프가 가까우면 밀려남
+  const a = L.anchors[tp.i] || { x:0, y:0 };
+  let px = 0, py = 0;
+  if (tp.state === 'idle'){
+    tapes.forEach(o => {
+      if (o === tp || o.state === 'idle' || o.state === 'dock') return;
+      const dx = a.x - o.p.x, dy = a.y - o.p.y, d = Math.hypot(dx, dy) || 1, R = L.sIdle;
+      if (d < R){ const f = (R - d) * .55; px += dx / d * f; py += dy / d * f; }
+    });
+  }
+  tp.push.x = damp(tp.push.x, px, 8, dt); tp.push.y = damp(tp.push.y, py, 8, dt);
+
+  const sDock = W * L.deck.s, f = tp.from;
+  const ir = IDLE_ROT[tp.i];
+  switch (tp.state){
+    case 'idle': {                       // 부드럽게 따라감 (damp)
+      const it = idleTarget(tp);
+      tp.p.x = damp(tp.p.x, it.x, 10, dt); tp.p.y = damp(tp.p.y, it.y, 10, dt); tp.p.z = damp(tp.p.z, it.z, 16, dt);
+      tp.q.slerp(qI, 1 - Math.exp(-8 * dt)); tp.s = damp(tp.s, it.s, 10, dt); tp.lift = damp(tp.lift, it.l, 9, dt);
+      break;
+    }
+    case 'drag': {
+      let tx = ptr.x + tp.off.x, ty = ptr.y + tp.off.y, ts, tl;
+      if (overDeck){
+        holderPose([0, 10, 40]); tmpQ.copy(hQ);
+        tx = (tx + hP.x) / 2; ty = (ty + hP.y) / 2; ts = sDock * 1.04; tl = 4;
+      } else {
+        tmpE.set(ir.x - clamp(ptr.vy * .01, -.3, .3), ir.y + clamp(ptr.vx * .01, -.3, .3), ir.z); tmpQ.setFromEuler(tmpE);
+        ts = L.sIdle * 1.08; tl = 26;
+      }
+      tp.p.x = damp(tp.p.x, tx, 20, dt); tp.p.y = damp(tp.p.y, ty, 20, dt); tp.p.z = damp(tp.p.z, 900, 20, dt);
+      tp.q.slerp(tmpQ, 1 - Math.exp(-10 * dt)); tp.s = damp(tp.s, ts, 14, dt); tp.lift = damp(tp.lift, tl, 9, dt);
+      break;
+    }
+    case 'insert': {                     // 슬롯 입구로 곡선 비행 → 그대로 이어서 홀더로 미끄러져 들어감
+      const el = T - tp.t0 - tp.delay;
+      const b = easeIO(clamp(el / TL.ins, 0, 1));
+      pathPose(tp, b, f, f.q, f.s, f.l);
+      if (el >= TL.ins) tp.state = 'dock';
+      break;
+    }
+    case 'dock': {                       // ③ 도어와 함께 닫히며 포켓 안으로 (홀더에 고정)
+      holderPose(); setPose(tp, hP.x, hP.y, hP.z, hQ, sDock, .5);
+      if (!tp.clunked && deck.door.to === 0 && deck.door.x < .002) onDock(tp);
+      break;
+    }
+    case 'eject': {                      // 도어와 함께 열림 → 같은 경로를 거꾸로 따라 제자리로
+      const el = T - tp.t0;
+      if (el < TL.door){ holderPose(); setPose(tp, hP.x, hP.y, hP.z, hQ, sDock, .5); }
+      else {
+        const t = clamp((el - TL.door) / TL.ins, 0, 1), it = idleTarget(tp);
+        pathPose(tp, 1 - easeIO(t), it, qI.clone(), it.s, it.l);
+        if (t >= 1) tp.state = 'idle';
+      }
+      break;
+    }
+    case 'return': {                     // 원래 자리로 복귀
+      const t = Math.min(1, (T - tp.t0) / TL.back), e = easeIO(t);
+      const it = idleTarget(tp);
+      tmpQ.copy(f.q).slerp(qI, e);
+      setPose(tp, lerp(f.x, it.x, e), lerp(f.y, it.y, e), lerp(f.z, it.z, e) + 320 * Math.sin(Math.PI * t),
+              tmpQ, lerp(f.s, it.s, e), lerp(f.l, it.l, e));
+      if (t >= 1) tp.state = 'idle';
+      break;
+    }
+  }
+  const g = tp.group;
+  g.position.set(tp.p.x, tp.p.y, tp.p.z);
+  g.quaternion.copy(tp.q);
+  g.scale.setScalar(tp.s / W);
+  tp.shadow.position.z = -D/2 - tp.lift;
+
+  // 릴 & 테이프 감김 (supply ↔ take-up)
+  const p = tp.progress;
+  const rL = Math.sqrt(R0*R0 + (R1*R1 - R0*R0) * (1 - p)), rR = Math.sqrt(R0*R0 + (R1*R1 - R0*R0) * p);
+  tp.spools[0].scale.setScalar(rL); tp.spools[1].scale.setScalar(rR);
+  if (tp === loaded && tp.state === 'dock'){
+    const v = (playing ? 24 : 0) + hubBoost;
+    tp.hubAng[0] += v / rL * dt; tp.hubAng[1] += v / rR * dt;
+  }
+  tp.hubs[0].rotation.z = -tp.hubAng[0]; tp.hubs[1].rotation.z = -tp.hubAng[1];
+}
+
+let last = performance.now(), clockSig = '';
+function tick(now){
+  const dt = Math.min(.05, (now - last) / 1000); last = now; T += dt;
+  if (playing && loaded){
+    beatPh += dt * loaded.bpm / 60 * Math.PI;
+    if (usesSong(loaded)){
+      const u = curSong(loaded).url, d = Song.durs[u];
+      if (d && Song.url === u && !Song.el.seeking){ loaded.frac = clamp(Song.time() / d, 0, 1); syncProg(loaded); }
+    }
+    else {
+      loaded.progress += dt / (TRACK_LEN * 4);
+      if (loaded.progress >= 1){ loaded.progress = 1; stop(); }
+    }
+  }
+  hubBoost = damp(hubBoost, 0, 3, dt);
+  // level / VU
+  const lv = playing ? (Audio.level(usesSong(loaded)) || (.35 + .3 * Math.abs(Math.sin(T * 7.3)) * Math.random())) : 0;
+  soundLvl = damp(soundLvl, lv, 18, dt);
+  [lv * (.92 + Math.random() * .12), lv * (.85 + Math.random() * .18)].forEach((v, c) => { vu[c] = v > vu[c] ? v : damp(vu[c], v, 6, dt); });
+
+  updateDeck(dt);
+  tapes.forEach(tp => updateTape(tp, dt));
+  scene.updateMatrixWorld();
+  const s = lcdState(), sig = Object.values(s).join('|');
+  if (sig !== lcd.sig){ lcd.sig = sig; drawLCD(s); }
+  linesTick(); npTick();
+  renderer.render(scene, camera);
+  const d = new Date(), cs = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+  if (cs !== clockSig){ clockSig = cs; $('#clock').textContent = cs; }
+  requestAnimationFrame(tick);
+}
+
+/* =========================================================
+   12. BOOT
+   ========================================================= */
+async function boot(){
+  try {
+    await Promise.race([
+      Promise.all([document.fonts.load('900 40px Unbounded'), document.fonts.load('800 20px "JetBrains Mono"'),
+                   document.fonts.load('500 20px "JetBrains Mono"'), document.fonts.load('400 20px "IBM Plex Sans KR"')]),
+      new Promise(r => setTimeout(r, 2500)),
+    ]);
+  } catch(e){}
+  measure();
+  deck = buildDeck();
+  const hubTex = hubTexture();
+  tapes = TAPES.map((t, i) => {
+    const built = buildCassette(t, i, hubTex);
+    const a = L.anchors[i] || { x:0, y:0 };
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(IDLE_ROT[i].x, IDLE_ROT[i].y, IDLE_ROT[i].z + 1.2));
+    return { ...t, i, ...built, state:'idle', progress:0, tr:0, frac:0, clunked:false, delay:0,
+      p:{ x:a.x, y:a.y - 260, z:-500 + i * 130 }, q, s:L.sIdle * .6,
+      lift:6, hover:0, jump:0, push:{ x:0, y:0 }, off:{ x:0, y:0 }, hubAng:[i, i * 2], t0:0 };
+  });
+  deck.group.position.set(L.deck.x, L.deck.y - 120, 0);
+  refreshUI();
+  new ResizeObserver(measure).observe(canvas);
+  new ResizeObserver(measure).observe(app);
+  window.addEventListener('resize', measure);
+  window.addEventListener('orientationchange', () => setTimeout(measure, 250));
+  $('#boot').classList.add('gone');
+  requestAnimationFrame(t => { last = t; tick(t); });
+}
+boot();
+</script>
+</body>
+</html>
