@@ -28,6 +28,7 @@
   --c-band-c:  #bdbdbd;   /* 테이프 C 라벨 밴드 */
   --c-band-d:  #b4b4b4;   /* 테이프 D 라벨 밴드 */
   --c-pocket:  #dcdcdc;   /* 플레이어 카세트 포켓 바닥 */
+  --c-lyric-tr: #b8b8b8;  /* 가사 모니터 번역 줄 ([-]) */
 
   --f-disp: 'Unbounded', 'Arial Black', sans-serif;
   --f-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
@@ -244,7 +245,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 
 /* ---------- LYRICS MONITOR (실시간 가사) ---------- */
 .mon{flex:1;min-width:0;max-width:460px;margin:0 auto;align-self:flex-end;display:flex;flex-direction:column;align-items:center}
-.mon-screen{position:relative;width:100%;height:84px;padding:9px 14px 0;overflow:hidden;
+.mon-screen{position:relative;width:100%;height:98px;padding:9px 14px 0;overflow:hidden;
   background:var(--c-ink);color:var(--c-paper);border:2px solid var(--c-ink);border-radius:10px;
   box-shadow:inset 0 0 0 3px var(--c-paper),inset 0 0 0 4px var(--c-ink),4px 4px 0 var(--c-ink)}
 .mon-screen::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;     /* 주사선 */
@@ -260,7 +261,9 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .mon-lines{margin-top:6px;font-family:var(--f-kr),'Hiragino Sans','Noto Sans JP',sans-serif}
 .mon-lines p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mon-cur{font-size:17px;font-weight:600;line-height:1.3}
-.mon-cur.in{animation:lyr .35s cubic-bezier(.2,.9,.3,1) both}
+.mon-tr{font-size:12px;line-height:1.35;font-weight:400;color:var(--c-lyric-tr);min-height:1.35em}
+.mon-cur.in,.mon-tr.in{animation:lyr .35s cubic-bezier(.2,.9,.3,1) both}
+.mon-tr.in{animation-delay:.04s}
 @keyframes lyr{from{opacity:0;transform:translateY(8px)}}
 .mon-nxt{font-size:11px;line-height:1.4;opacity:.45;margin-top:1px}
 .mon-bar{position:absolute;left:14px;right:14px;bottom:7px;height:2px;background:color-mix(in srgb,var(--c-paper) 18%,transparent)}
@@ -281,10 +284,11 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
   .meta #clock{display:none}
   .top{display:grid;grid-template-columns:minmax(0,1fr) auto;row-gap:10px}
   .mon{grid-column:1 / -1;grid-row:2;max-width:none;width:100%}
-  .mon-screen{height:58px;padding:6px 12px 0;border-radius:8px}
+  .mon-screen{height:72px;padding:6px 12px 0;border-radius:8px}
   .mon-top{font-size:8px}
   .mon-lines{margin-top:3px}
   .mon-cur{font-size:14px}
+  .mon-tr{font-size:11px}
   .mon-nxt{display:none}
   .mon-bar{bottom:5px}
   .mon-stand{display:none}
@@ -311,7 +315,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
   .top{padding-bottom:8px}
   .wordmark{font-size:30px}
   .sub{display:none}
-  .mon-screen{height:62px;padding-top:6px}
+  .mon-screen{height:76px;padding-top:6px}
   .mon-nxt,.mon-stand{display:none}
   .grid{padding:10px 0;gap:14px}
   .bottom{display:none}
@@ -342,7 +346,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
     <div class="mon" id="mon" aria-live="polite">
       <div class="mon-screen">
         <div class="mon-top"><span class="rec"><i></i><span id="monTag">LYRICS</span></span><span id="monTime">--:--</span></div>
-        <div class="mon-lines"><p class="mon-cur" id="monCur">INSERT TAPE</p><p class="mon-nxt" id="monNxt">테이프를 넣으세요</p></div>
+        <div class="mon-lines"><p class="mon-cur" id="monCur">INSERT TAPE</p><p class="mon-tr" id="monTr"></p><p class="mon-nxt" id="monNxt">테이프를 넣으세요</p></div>
         <div class="mon-bar"><i id="monBar"></i></div>
       </div>
       <div class="mon-stand"></div>
@@ -791,40 +795,52 @@ function unlockAudio(tp){                                                    // 
 
 /* =========================================================
    2-2. LYRICS (실시간 가사 · LRC)
-   - 곡마다 같은 이름의 .lrc 파일을 자동으로 읽음 (예: 名もない色.mp3 → 名もない色.lrc)
+   - 이 저장소의 lyrics/ 폴더에서 곡 파일명과 같은 이름의 .lrc 를 읽음 (예: 名もない色.mp3 → lyrics/名もない色.lrc)
+     없으면 mp3 와 같은 위치(노래 저장소)의 .lrc 를 시도
    - 다른 주소를 쓰려면 TAPES 의 곡에 lrc:'주소' 를 추가
-   - LRC 형식 : [00:12.34]가사 한 줄   (한 줄에 시간 여러 개 가능)
+   - LRC 형식 : [00:12.34]가사 한 줄          (한 줄에 시간 여러 개 가능)
+                [00:12.34] [-] 번역           (또는 [-] 번역 — 바로 위 가사 줄의 번역 · 작게 다른 색으로 아래에 표시)
    ========================================================= */
 const LYRIC_LEAD = 0.15;                       // 가사를 조금 일찍 띄우는 시간 (sec)
 const Lyrics = {
-  cache:{},                                    // url → 'loading' | null(없음) | [{t, text}]
-  url: x => x.lrc || x.url.replace(/\.mp3(\?.*)?$/i, '.lrc'),
+  cache:{},                                    // key → 'loading' | null(없음) | [{t, text, tr}]
+  urls(x){
+    if (x.lrc) return [x.lrc];
+    const file = x.url.split('/').pop().split('?')[0], stem = decodeURIComponent(file).replace(/\.mp3$/i, '');
+    return ['lyrics/' + encodeURIComponent(stem) + '.lrc', x.url.split('?')[0].replace(/\.mp3$/i, '.lrc')];
+  },
   get(x){
-    const u = this.url(x);
-    if (!(u in this.cache)){
-      this.cache[u] = 'loading';
-      fetch(u).then(r => r.ok ? r.text() : null).then(t => { this.cache[u] = t ? this.parse(t) : null; })
-              .catch(() => { this.cache[u] = null; });
+    const key = x.url;
+    if (!(key in this.cache)){
+      this.cache[key] = 'loading';
+      const tryNext = ([u, ...rest]) => {
+        if (!u){ this.cache[key] = null; return; }
+        fetch(u).then(r => r.ok ? r.text() : null).catch(() => null)
+          .then(t => { const L = t && this.parse(t); if (L) this.cache[key] = L; else tryNext(rest); });
+      };
+      tryNext(this.urls(x));
     }
-    return this.cache[u];
+    return this.cache[key];
   },
   parse(txt){
-    const out = [];
-    let offset = 0;
-    txt.split(/\r?\n/).forEach(line => {
-      const off = line.match(/^\[offset:\s*([+-]?\d+)\]/i); if (off){ offset = +off[1] / 1000; return; }
-      const tags = [...line.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)]; if (!tags.length) return;
-      const text = line.replace(/\[[^\]]*\]/g, '').trim();
-      tags.forEach(m => out.push({ t: +m[1] * 60 + +m[2], text }));
+    const out = [], TT = /\[(\d+):(\d+(?:\.\d+)?)\]/g;
+    let offset = 0, prev = [];
+    txt.replace(/^﻿/, '').split(/\r?\n/).forEach(line => {
+      const off = line.match(/^\s*\[offset:\s*([+-]?\d+)\]/i); if (off){ offset = +off[1] / 1000; return; }
+      const tags = [...line.matchAll(TT)], rest = line.replace(TT, '').trim();
+      const tr = rest.match(/^\[-\]\s*(.*)$/);                                // 번역 줄 → 바로 위 가사에 붙임
+      if (tr){ const t = tr[1].trim(); if (t) prev.forEach(l => l.tr = l.tr ? l.tr + ' / ' + t : t); return; }
+      if (!tags.length) return;
+      prev = tags.map(m => ({ t: +m[1] * 60 + +m[2], text: rest, tr:'' })); out.push(...prev);
     });
     out.forEach(l => l.t -= offset);
     out.sort((a, b) => a.t - b.t);
     return out.length ? out : null;
   },
 };
-const mon = { el:$('#mon'), cur:$('#monCur'), nxt:$('#monNxt'), tag:$('#monTag'), time:$('#monTime'), bar:$('#monBar'), sig:'', line:'' };
+const mon = { el:$('#mon'), cur:$('#monCur'), tr:$('#monTr'), nxt:$('#monNxt'), tag:$('#monTag'), time:$('#monTime'), bar:$('#monBar'), sig:'', line:'' };
 function monState(){
-  if (!loaded) return { tag:'LYRICS', cur:'INSERT TAPE', nxt:'테이프를 넣으세요', key:'empty' };
+  if (!loaded) return { tag:'LYRICS', cur:'INSERT TAPE', tr:'', nxt:'테이프를 넣으세요', key:'empty' };
   if (!usesSong(loaded)){
     const tr = curTrack();
     return { tag:`TAPE ${loaded.id} · INST`, cur:loaded.tracks[tr], nxt:'INSTRUMENTAL · NO LYRICS', key:'inst' + tr };
@@ -836,20 +852,22 @@ function monState(){
   const t = (Song.url === song.url ? Song.time() : loaded.frac * tapeDur(loaded)) + LYRIC_LEAD;
   let i = -1; while (i + 1 < L.length && L[i + 1].t <= t) i++;
   const line = k => k < 0 ? song.title : (L[k] ? L[k].text || '♪' : '');
-  return { tag, cur:line(i), nxt:line(i + 1), key:tr + ':' + i };
+  return { tag, cur:line(i), tr:i >= 0 && L[i].text ? L[i].tr : '', nxt:line(i + 1), key:tr + ':' + i };
 }
 function monTick(){
   const s = monState(), p = loaded ? dispFrac(loaded) : 0;
   mon.bar.style.width = (p * 100) + '%';
   mon.el.classList.toggle('live', playing);
   const tm = loaded ? fmt(p * tapeDur(loaded)) : '--:--';
-  const sig = s.key + '|' + s.cur + '|' + s.nxt + '|' + s.tag + '|' + tm;
+  const sig = s.key + '|' + s.cur + '|' + (s.tr || '') + '|' + s.nxt + '|' + s.tag + '|' + tm;
   if (sig === mon.sig) return; mon.sig = sig;
   mon.tag.textContent = s.tag; mon.time.textContent = tm; mon.nxt.textContent = s.nxt;
   if (s.key !== mon.line){                                                  // 줄이 바뀔 때만 애니메이션
-    mon.line = s.key; mon.cur.textContent = s.cur;
-    mon.cur.classList.remove('in'); void mon.cur.offsetWidth; mon.cur.classList.add('in');
-  } else mon.cur.textContent = s.cur;
+    mon.line = s.key;
+    [mon.cur, mon.tr].forEach(e => e.classList.remove('in')); void mon.cur.offsetWidth;
+    [mon.cur, mon.tr].forEach(e => e.classList.add('in'));
+  }
+  mon.cur.textContent = s.cur; mon.tr.textContent = s.tr || '';
 }
 
 /* =========================================================
