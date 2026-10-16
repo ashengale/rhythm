@@ -499,9 +499,10 @@ const spring = (o, dt, k = 170, c = 13) => { o.v += (-k * o.x - c * o.v) * dt; o
    1. DATA
    ========================================================= */
 /* ---- 노래 (mp3 재생 목록) ----
-   테이프 A·B 의 list 에 곡을 추가/삭제하면 재생 목록이 바뀝니다.  { title:'곡 제목', url:RAW + '파일명' }
-   GitHub 파일은 raw.githubusercontent.com/{계정}/{저장소}/main/{파일명} 형식이어야 재생됩니다.
+   테이프 A·B 의 list 에 곡을 추가/삭제하면 재생 목록이 바뀝니다.  { title:'곡 제목', url:SONGS + '파일명' }
+   SONGS = 이 저장소의 songs/ 폴더.  다른 저장소 파일은 RAW (raw.githubusercontent.com/{계정}/{저장소}/main/{파일명}) 로.
    테이프 C·D 는 내장 베이스 연주(신스). 링크가 열리지 않는 곡은 건너뛰고, 전부 실패하면 신스로 대체. */
+const SONGS = 'songs/';
 const RAW = 'https://raw.githubusercontent.com/ashengale/nyalog/main/';
 const SONG_VOLUME = 0.6;    // mp3 노래 볼륨 (0 ~ 1)
 
@@ -513,17 +514,17 @@ const TAPES = [
     root:220.00, scale:[0,2,4,7,9,12,14,16], bpm:84, wave:'triangle',
     tracks:['Paper Light','Dot Gain','Soft Register','Low Fade'],
     list:[
-      { title:'名もない色',         url:RAW + '%E5%90%8D%E3%82%82%E3%81%AA%E3%81%84%E8%89%B2.mp3' },
-      { title:'不器用なノイズ',      url:RAW + '%E4%B8%8D%E5%99%A8%E7%94%A8%E3%81%AA%E3%83%8E%E3%82%A4%E3%82%BA.mp3' },
-      { title:'僕が印をつけたもの',   url:RAW + '%E5%83%95%E3%81%8C%E5%8D%B0%E3%82%92%E3%81%A4%E3%81%91%E3%81%9F%E3%82%82%E3%81%AE.mp3' },
+      { title:'名もない色',         url:SONGS + '%E5%90%8D%E3%82%82%E3%81%AA%E3%81%84%E8%89%B2.mp3' },
+      { title:'不器用なノイズ',      url:SONGS + '%E4%B8%8D%E5%99%A8%E7%94%A8%E3%81%AA%E3%83%8E%E3%82%A4%E3%82%BA.mp3' },
+      { title:'僕が印をつけたもの',   url:SONGS + '%E5%83%95%E3%81%8C%E5%8D%B0%E3%82%92%E3%81%A4%E3%81%91%E3%81%9F%E3%82%82%E3%81%AE.mp3' },
     ] },
   { id:'B', name:'NIGHT GRAIN',    side:'SIDE A', len:'C-46', pattern:'dots',    band:cssVar('--c-band-b')||'#a9a9a9',
     root:174.61, scale:[0,3,5,7,10,12,15,17], bpm:72, wave:'sine',
     tracks:['Grain Theory','45° Screen','Ink Trap','After Hours'],
     list:[
-      { title:'秘密の檻', url:RAW + '%E7%A7%98%E5%AF%86%E3%81%AE%E6%AA%BB.mp3' },
-      { title:'棘の律',   url:RAW + '%E6%A3%98%E3%81%AE%E5%BE%8B.mp3' },
-      { title:'共犯',     url:RAW + '%E5%85%B1%E7%8A%AF.mp3' },
+      { title:'秘密の檻', url:SONGS + '%E7%A7%98%E5%AF%86%E3%81%AE%E6%AA%BB.mp3' },
+      { title:'棘の律',   url:SONGS + '%E6%A3%98%E3%81%AE%E5%BE%8B.mp3' },
+      { title:'共犯',     url:SONGS + '%E5%85%B1%E7%8A%AF.mp3' },
     ] },
   { id:'C', name:'MONO RIVER',     side:'SIDE B', len:'C-90', pattern:'checker', band:cssVar('--c-band-c')||'#bdbdbd',
     root:196.00, scale:[0,2,3,5,7,9,10,12], bpm:96, wave:'triangle',
