@@ -123,6 +123,17 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .snd i{width:26px;height:14px;border:1.5px solid var(--c-ink);border-radius:8px;position:relative}
 .snd i::after{content:"";position:absolute;top:2px;left:2px;width:7px;height:7px;border-radius:50%;background:var(--c-ink);transition:transform .2s}
 .snd.on i::after{transform:translateX(12px)}
+.actl{display:flex;align-items:center;gap:18px}
+.vol{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:.2em;font-weight:800}
+.vol b{width:3ch;text-align:right;font-weight:800;letter-spacing:0}
+.vol.mute b{color:var(--c-ink-3)}
+.vol input{-webkit-appearance:none;appearance:none;width:110px;height:18px;background:transparent;cursor:pointer;touch-action:none;
+  --p:100%}
+.vol input::-webkit-slider-runnable-track{height:4px;background:linear-gradient(90deg,var(--c-ink) var(--p),var(--c-paper-3) var(--p))}
+.vol input::-moz-range-track{height:4px;background:linear-gradient(90deg,var(--c-ink) var(--p),var(--c-paper-3) var(--p))}
+.vol input::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:16px;margin-top:-6px;background:var(--c-paper);border:2px solid var(--c-ink);border-radius:2px}
+.vol input::-moz-range-thumb{width:6px;height:12px;background:var(--c-paper);border:2px solid var(--c-ink);border-radius:2px}
+.vol input:focus-visible{outline:2px solid var(--c-ink);outline-offset:3px}
 
 /* ---------- 3D CANVAS & OVERLAYS ---------- */
 #gl{position:fixed;left:0;top:0;width:100vw;height:100vh;height:100svh;z-index:10;pointer-events:none}
@@ -266,7 +277,8 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
   .anchor[data-i="2"]{left:27%;top:66%}
   .anchor[data-i="3"]{left:73%;top:70%}
   .steps,.bottom .copy{display:none}
-  .snd{margin-left:auto}
+  .actl{margin-left:auto;gap:12px}
+  .vol input{width:84px}
   .bottom{padding-top:8px;font-size:9px}
 }
 @media (max-width:400px){ .sub .kr{display:none} }
@@ -334,7 +346,10 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
   <footer class="bottom">
     <span class="copy">HALF/TONE LABS — 2026</span>
     <div class="steps"><span><b>01</b> SELECT</span><span><b>02</b> INSERT</span><span><b>03</b> PLAY</span></div>
-    <button class="snd on" id="snd"><span id="sndTxt">SOUND ON</span><i></i></button>
+    <div class="actl">
+      <label class="vol" id="volBox"><span>VOL</span><input type="range" id="vol" min="0" max="100" step="1" value="100" aria-label="volume"><b id="volTxt">100</b></label>
+      <button class="snd on" id="snd"><span id="sndTxt">SOUND ON</span><i></i></button>
+    </div>
   </footer>
 </div>
 
@@ -487,12 +502,12 @@ const fmt = s => { s = Math.max(0, Math.floor(s)); return String(Math.floor(s/60
    2. AUDIO (WebAudio — 생성형 로파이 + 기계음)
    ========================================================= */
 const Audio = {
-  ctx:null, on:true, timer:null, pads:null, active:false,
+  ctx:null, on:true, vol:1, timer:null, pads:null, active:false,
   init(){
     if (this.ctx) return true;
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return false;
     const c = this.ctx = new AC();
-    this.out = c.createGain(); this.out.gain.value = this.on ? 1 : 0; this.out.connect(c.destination);
+    this.out = c.createGain(); this.out.gain.value = this.on ? this.vol : 0; this.out.connect(c.destination);
     this.an = c.createAnalyser(); this.an.fftSize = 512; this.buf = new Float32Array(512);
     this.an.connect(this.out);
     this.tone = c.createBiquadFilter(); this.tone.type = 'lowpass'; this.tone.frequency.value = 2600; this.tone.Q.value = .5;
@@ -508,7 +523,12 @@ const Audio = {
     return true;
   },
   resume(){ if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
-  setOn(v){ this.on = v; if (this.ctx) this.out.gain.setTargetAtTime(v ? 1 : 0, this.ctx.currentTime, .05); if (Song.el) Song.el.muted = !v; },
+  setOn(v){ this.on = v; if (this.ctx) this.out.gain.setTargetAtTime(v ? this.vol : 0, this.ctx.currentTime, .05); if (Song.el) Song.el.muted = !v; },
+  setVol(v){                                                                 // 마스터 볼륨 (0 ~ 1)
+    this.vol = clamp(v, 0, 1);
+    if (this.ctx) this.out.gain.setTargetAtTime(this.on ? this.vol : 0, this.ctx.currentTime, .03);
+    if (Song.el && !Song.node) Song.el.volume = SONG_VOLUME * this.vol;     // CORS 불가 → <audio> 자체 볼륨
+  },
   start(tape, getTrack, withSynth = true){
     if (!this.init()) return; this.resume(); this.stop(true);
     const c = this.ctx, t = c.currentTime;
@@ -653,7 +673,7 @@ const Song = {
     const el = document.createElement('audio');
     el.preload = 'auto'; el.playsInline = true; el.setAttribute('playsinline', '');
     if (cors) el.crossOrigin = 'anonymous';
-    el.muted = !Audio.on; el.volume = cors ? 1 : SONG_VOLUME;
+    el.muted = !Audio.on; el.volume = cors ? 1 : SONG_VOLUME * Audio.vol;
     el.addEventListener('loadedmetadata', () => {
       if (this.el !== el) return;
       this.durs[this.url] = isFinite(el.duration) ? el.duration : 0;
@@ -695,12 +715,12 @@ const Song = {
       this.node = Audio.ctx.createMediaElementSource(this.el);
       const g = Audio.ctx.createGain(); g.gain.value = SONG_VOLUME;
       this.node.connect(g).connect(Audio.an); this.el.volume = 1;
-    } catch(e){ this.node = null; this.el.volume = SONG_VOLUME; }
+    } catch(e){ this.node = null; this.el.volume = SONG_VOLUME * Audio.vol; }
   },
   play(frac){
     this.wantPlay = true;
     Audio.init(); Audio.resume(); this.connect();
-    const el = this.el; el.muted = !Audio.on; if (!this.node) el.volume = SONG_VOLUME;
+    const el = this.el; el.muted = !Audio.on; if (!this.node) el.volume = SONG_VOLUME * Audio.vol;
     this.seek(frac);
     return el.play() || Promise.resolve();
   },
@@ -1197,6 +1217,18 @@ function toggleSound(){
 }
 sndBtn.addEventListener('click', toggleSound);
 
+/* ---- 볼륨 슬라이더 (0 ~ 100, 체감 음량에 맞춰 제곱 커브 · 브라우저에 저장) ---- */
+const volEl = $('#vol'), volTxt = $('#volTxt'), volBox = $('#volBox');
+function setVolume(n, save = true){
+  n = Math.round(clamp(+n || 0, 0, 100));
+  volEl.value = n; volTxt.textContent = n;
+  volEl.style.setProperty('--p', n + '%'); volBox.classList.toggle('mute', n === 0);
+  Audio.setVol((n / 100) ** 2);
+  if (save) try { localStorage.setItem('ht-volume', n); } catch(e){}
+}
+volEl.addEventListener('input', () => setVolume(volEl.value));
+try { const v = localStorage.getItem('ht-volume'); setVolume(v == null ? 100 : v, false); } catch(e){ setVolume(100, false); }
+
 /* =========================================================
    8. POPUP (드래그 가능, 뷰포트 밖으로 나가지 않음)
    ========================================================= */
@@ -1237,6 +1269,7 @@ function popHTML(kind){
         <li><b>02</b>넣으면 자동 재생 · ▶ 버튼이나 장착된 테이프 탭으로 재생/정지</li>
         <li><b>03</b>⏏ 버튼 또는 플레이어 밖으로 끌어내면 배출</li>
         <li><b>04</b>상단 노브를 누르면 사운드 ON/OFF</li>
+        <li><b>05</b>하단 VOL 슬라이더 또는 ↑ ↓ 키로 볼륨 조절</li>
       </ul>
     </div>`;
   }
@@ -1339,7 +1372,7 @@ function setPtr(e){
   ptr.nx = clamp(e.clientX / L.W * 2 - 1, -1, 1); ptr.ny = clamp(e.clientY / L.H * 2 - 1, -1, 1);
 }
 function inDeck(cx, cy){ const r = L.deck.rect; if (!r) return false; return cx > r.left && cx < r.right && cy > r.top && cy < r.bottom; }
-const blocked = e => e.target.closest && e.target.closest('.snd, .pop-layer');
+const blocked = e => e.target.closest && e.target.closest('.actl, .pop-layer');
 
 window.addEventListener('pointerdown', e => {
   if (blocked(e) || !deck) return;
@@ -1390,6 +1423,9 @@ window.addEventListener('pointerup', endDrag);
 window.addEventListener('pointercancel', endDrag);
 window.addEventListener('keydown', e => {
   if (!deck) return;
+  if (e.target.closest && e.target.closest('input')) return;               // 슬라이더 조작 중엔 무시
+  if (e.key === 'ArrowUp' || e.key === 'ArrowRight' || e.key === '+' || e.key === '='){ e.preventDefault(); setVolume(+volEl.value + 5); return; }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === '-'){ e.preventDefault(); setVolume(+volEl.value - 5); return; }
   if (['1','2','3','4'].includes(e.key)) unlockAudio(tapes[+e.key - 1]);
   else if (e.code === 'Space' || e.key === 'e' || e.key === 'E') unlockAudio();
   if (e.code === 'Space'){ e.preventDefault(); pressBtn('play'); }
