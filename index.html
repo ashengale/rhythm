@@ -465,11 +465,11 @@ const spring = (o, dt, k = 170, c = 13) => { o.v += (-k * o.x - c * o.v) * dt; o
    GitHub 파일은 raw.githubusercontent.com/{계정}/{저장소}/main/{파일명} 형식이어야 재생됩니다.
    테이프 C·D 는 내장 베이스 연주(신스). 링크가 열리지 않는 곡은 건너뛰고, 전부 실패하면 신스로 대체. */
 const RAW = 'https://raw.githubusercontent.com/ashengale/nyalog/main/';
-const SONG_VOLUME = 0.15;   // mp3 노래 볼륨 (0 ~ 1)
+const SONG_VOLUME = 0.6;    // mp3 노래 볼륨 (0 ~ 1)
 
 const TRACK_LEN = 40;   // 내장 신스 트랙 길이 (sec)
-const VOLUME = 0.16;    // 내장 신스 볼륨 (0 ~ 1)
-const SFX_VOLUME = 0.25; // 효과음 볼륨 (0 ~ 1)
+const VOLUME = 0.45;    // 내장 신스 볼륨 (0 ~ 1)
+const SFX_VOLUME = 0.4;  // 효과음 볼륨 (0 ~ 1)
 const TAPES = [
   { id:'A', name:'MORNING STATIC', side:'SIDE A', len:'C-60', pattern:'hatch',   band:cssVar('--c-band-a')||'#d0d0d0',
     root:220.00, scale:[0,2,4,7,9,12,14,16], bpm:84, wave:'triangle',
@@ -1224,10 +1224,10 @@ function setVolume(n, save = true){
   volEl.value = n; volTxt.textContent = n;
   volEl.style.setProperty('--p', n + '%'); volBox.classList.toggle('mute', n === 0);
   Audio.setVol((n / 100) ** 2);
-  if (save) try { localStorage.setItem('ht-volume', n); } catch(e){}
+  if (save) try { localStorage.setItem('ht-volume-v2', n); } catch(e){}
 }
 volEl.addEventListener('input', () => setVolume(volEl.value));
-try { const v = localStorage.getItem('ht-volume'); setVolume(v == null ? 100 : v, false); } catch(e){ setVolume(100, false); }
+try { const v = localStorage.getItem('ht-volume-v2'); setVolume(v == null ? 100 : v, false); } catch(e){ setVolume(100, false); }
 
 /* =========================================================
    8. POPUP (드래그 가능, 뷰포트 밖으로 나가지 않음)
