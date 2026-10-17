@@ -6,8 +6,12 @@
 <title>HALF/TONE Cassette Deck</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600&family=JetBrains+Mono:wght@400;500;700;800&family=Unbounded:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="preload" href="fonts/Galmuri11.woff2" as="font" type="font/woff2" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Unbounded:wght@500;700;900&display=swap" rel="stylesheet">
 <style>
+/* 픽셀 폰트 Galmuri11 (한국어 · 일본어 · 한자) — SIL OFL, fonts/Galmuri-OFL.md
+   굵기 범위를 지정해 굵은 글씨에서도 가짜 볼드 없이 픽셀 그대로 표시 */
+@font-face{font-family:'Galmuri11';src:url('fonts/Galmuri11.woff2') format('woff2');font-weight:100 900;font-display:swap}
 /* =========================================================
    COLOR TOKENS — 여기서 색상만 바꾸면 UI + 3D 전체에 반영됩니다
    ========================================================= */
@@ -30,9 +34,9 @@
   --c-pocket:  #dcdcdc;   /* 플레이어 카세트 포켓 바닥 */
   --c-lyric-tr: #b8b8b8;  /* 가사 모니터 번역 줄 ([-]) */
 
-  --f-disp: 'Unbounded', 'Arial Black', sans-serif;
-  --f-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
-  --f-kr:   'IBM Plex Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  --f-disp: 'Unbounded', 'Galmuri11', 'Arial Black', sans-serif;
+  --f-mono: 'JetBrains Mono', 'Galmuri11', ui-monospace, Menlo, monospace;
+  --f-kr:   'Galmuri11', 'Apple SD Gothic Neo', 'Hiragino Sans', sans-serif;   /* 한국어 · 일본어 */
 
   --gutter: clamp(14px, 2.2vw, 34px);
 
@@ -245,7 +249,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 
 /* ---------- LYRICS MONITOR (실시간 가사) ---------- */
 .mon{flex:1;min-width:0;max-width:460px;margin:0 auto;align-self:flex-end;display:flex;flex-direction:column;align-items:center}
-.mon-screen{position:relative;width:100%;height:98px;padding:9px 14px 0;overflow:hidden;
+.mon-screen{position:relative;width:100%;height:112px;padding:9px 14px 0;overflow:hidden;
   background:var(--c-ink);color:var(--c-paper);border:2px solid var(--c-ink);border-radius:10px;
   box-shadow:inset 0 0 0 3px var(--c-paper),inset 0 0 0 4px var(--c-ink),4px 4px 0 var(--c-ink)}
 .mon-screen::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;     /* 주사선 */
@@ -258,14 +262,17 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .mon-top .rec i{width:6px;height:6px;border-radius:50%;background:var(--c-paper);opacity:.35}
 .mon.live .mon-top .rec i{opacity:1;animation:blink 1.1s steps(2,start) infinite}
 @keyframes blink{to{visibility:hidden}}
-.mon-lines{margin-top:6px;font-family:var(--f-kr),'Hiragino Sans','Noto Sans JP',sans-serif}
+.mon-lines{margin-top:6px;font-family:var(--f-kr);font-weight:400}
 .mon-lines p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mon-cur{font-size:17px;font-weight:600;line-height:1.3}
-.mon-tr{font-size:12px;line-height:1.35;font-weight:400;color:var(--c-lyric-tr);min-height:1.35em}
-.mon-cur.in,.mon-tr.in{animation:lyr .35s cubic-bezier(.2,.9,.3,1) both}
-.mon-tr.in{animation-delay:.04s}
-@keyframes lyr{from{opacity:0;transform:translateY(8px)}}
-.mon-nxt{font-size:11px;line-height:1.4;opacity:.45;margin-top:1px}
+.mon-cur{font-size:24px;line-height:1.25}
+.mon-tr{font-size:12px;line-height:1.35;color:var(--c-lyric-tr);min-height:1.35em}
+.mon-nxt{font-size:12px;line-height:1.4;opacity:.4;margin-top:1px}
+/* 글자 뜨는 효과 : 한 글자씩 타이핑 + 형광 잔상, 끝에 블록 커서 */
+.mon-lines .ch{animation:chIn .32s steps(4,end) both}
+@keyframes chIn{0%{opacity:0}25%{opacity:1;text-shadow:0 0 8px var(--c-paper),0 0 2px var(--c-paper)}100%{opacity:1;text-shadow:none}}
+.mon-cur.typing::after{content:"";display:inline-block;width:.5em;height:.9em;margin-left:3px;vertical-align:-.08em;
+  background:var(--c-paper);animation:blink .5s steps(2,start) infinite}
+@media (prefers-reduced-motion: reduce){ .mon-lines .ch{animation:none} .mon-cur.typing::after{display:none} }
 .mon-bar{position:absolute;left:14px;right:14px;bottom:7px;height:2px;background:color-mix(in srgb,var(--c-paper) 18%,transparent)}
 .mon-bar i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--c-paper)}
 .mon-stand{width:58px;height:7px;border:2px solid var(--c-ink);border-top:0;border-radius:0 0 6px 6px;background:var(--c-paper)}
@@ -284,11 +291,11 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
   .meta #clock{display:none}
   .top{display:grid;grid-template-columns:minmax(0,1fr) auto;row-gap:10px}
   .mon{grid-column:1 / -1;grid-row:2;max-width:none;width:100%}
-  .mon-screen{height:72px;padding:6px 12px 0;border-radius:8px}
+  .mon-screen{height:84px;padding:6px 12px 0;border-radius:8px}
   .mon-top{font-size:8px}
   .mon-lines{margin-top:3px}
-  .mon-cur{font-size:14px}
-  .mon-tr{font-size:11px}
+  .mon-cur{font-size:24px}
+  .mon-tr{font-size:12px}
   .mon-nxt{display:none}
   .mon-bar{bottom:5px}
   .mon-stand{display:none}
@@ -315,7 +322,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
   .top{padding-bottom:8px}
   .wordmark{font-size:30px}
   .sub{display:none}
-  .mon-screen{height:76px;padding-top:6px}
+  .mon-screen{height:84px;padding-top:6px}
   .mon-nxt,.mon-stand{display:none}
   .grid{padding:10px 0;gap:14px}
   .bottom{display:none}
@@ -863,12 +870,27 @@ function monTick(){
   const sig = s.key + '|' + s.cur + '|' + (s.tr || '') + '|' + s.nxt + '|' + s.tag + '|' + tm;
   if (sig === mon.sig) return; mon.sig = sig;
   mon.tag.textContent = s.tag; mon.time.textContent = tm; mon.nxt.textContent = s.nxt;
-  if (s.key !== mon.line){                                                  // 줄이 바뀔 때만 애니메이션
-    mon.line = s.key;
-    [mon.cur, mon.tr].forEach(e => e.classList.remove('in')); void mon.cur.offsetWidth;
-    [mon.cur, mon.tr].forEach(e => e.classList.add('in'));
+  const line = s.key + '|' + s.cur + '|' + (s.tr || '');
+  if (line !== mon.line){ mon.line = line; showLine(s.cur, s.tr || ''); }    // 줄이 바뀔 때만 다시 타이핑
+}
+function typeIn(el, text, t0){                                              // 한 글자씩 나타나기
+  el.textContent = ''; el.style.fontSize = '';
+  const chars = [...text], step = Math.min(45, 520 / Math.max(1, chars.length));
+  const frag = document.createDocumentFragment();
+  chars.forEach((c, i) => { const sp = document.createElement('span'); sp.className = 'ch'; sp.textContent = c;
+    sp.style.animationDelay = Math.round(t0 + i * step) + 'ms'; frag.append(sp); });
+  el.append(frag);
+  if (el.scrollWidth > el.clientWidth + 1){                                 // 길면 한 줄에 맞게 줄임
+    const fs = parseFloat(getComputedStyle(el).fontSize);
+    el.style.fontSize = Math.max(10, fs * el.clientWidth / el.scrollWidth * .98) + 'px';
   }
-  mon.cur.textContent = s.cur; mon.tr.textContent = s.tr || '';
+  return t0 + chars.length * step;
+}
+function showLine(cur, tr){
+  const end = typeIn(mon.cur, cur, 0);
+  typeIn(mon.tr, tr, Math.min(end, 260));
+  mon.cur.classList.add('typing'); clearTimeout(mon.tt);
+  mon.tt = setTimeout(() => mon.cur.classList.remove('typing'), end + 450);
 }
 
 /* =========================================================
@@ -970,22 +992,22 @@ function labelTexture(t){
   g.save(); rr(g, .4, .4, 89.2, 42.2, 2.6); g.clip(); g.fillStyle = t.band; g.fillRect(0, 11.6, 90, 21.4); g.restore();
   rr(g, 2, 2, 86, 8, 1.2); g.fillStyle = INK; g.fill();
   g.fillStyle = PAPER; g.font = '900 5px Unbounded'; g.fillText('HALF/TONE', 4, 8.15);
-  g.font = '700 2.3px "JetBrains Mono"'; g.textAlign = 'right'; g.fillText(`${t.len} · TYPE I`, 86, 7.6); g.textAlign = 'left';
+  g.font = '700 2.3px "JetBrains Mono", Galmuri11'; g.textAlign = 'right'; g.fillText(`${t.len} · TYPE I`, 86, 7.6); g.textAlign = 'left';
   g.fillStyle = INK; g.fillRect(3.6, 14, 9.6, 9.6);
   g.fillStyle = PAPER; g.font = '900 7.2px Unbounded'; g.textAlign = 'center'; g.fillText(t.id, 8.4, 21.7);
-  g.fillStyle = INK; g.font = '800 1.9px "JetBrains Mono"'; g.fillText('SIDE', 8.4, 26.4); g.fillText(t.side.slice(-1), 8.4, 29.2);
+  g.fillStyle = INK; g.font = '800 1.9px "JetBrains Mono", Galmuri11'; g.fillText('SIDE', 8.4, 26.4); g.fillText(t.side.slice(-1), 8.4, 29.2);
   g.textAlign = 'left';
   g.save(); g.translate(81.2, 19.2); g.strokeStyle = INK; g.lineWidth = 1.9;
   g.beginPath(); g.moveTo(-3.6,-3.6); g.lineTo(1.4,1.4); g.stroke();
   g.fillStyle = INK; g.beginPath(); g.moveTo(3.8,3.8); g.lineTo(3.8,-1.6); g.lineTo(-1.6,3.8); g.closePath(); g.fill(); g.restore();
   g.lineWidth = .35; g.strokeStyle = INK; g.strokeRect(76.6, 25.4, 9.2, 3.2);
-  g.font = '800 1.8px "JetBrains Mono"'; g.fillStyle = INK; g.textAlign = 'center'; g.fillText('STEREO', 81.2, 27.6); g.textAlign = 'left';
+  g.font = '800 1.8px "JetBrains Mono", Galmuri11'; g.fillStyle = INK; g.textAlign = 'center'; g.fillText('STEREO', 81.2, 27.6); g.textAlign = 'left';
   g.lineWidth = .3;
   for (let i = 0; i <= 8; i++){ const x = 34 + i * 2.75, l = i === 4 ? 1.6 : .9; g.beginPath(); g.moveTo(x, 13.4 - l); g.lineTo(x, 13.4); g.stroke(); }
   rr(g, 16, 14, 58, 17, 8.5); g.save(); g.globalCompositeOperation = 'destination-out'; g.fill(); g.restore();   // 투명 창
   g.lineWidth = .55; rr(g, 16, 14, 58, 17, 8.5); g.stroke();
-  g.fillStyle = INK; g.font = '800 3.1px "JetBrains Mono"'; g.fillText(t.name, 4, 37.4);
-  g.font = '500 1.8px "JetBrains Mono"'; g.fillText(`${t.side} · STEREO · 120µs EQ`, 4, 40.3);
+  g.fillStyle = INK; g.font = '800 3.1px "JetBrains Mono", Galmuri11'; g.fillText(t.name, 4, 37.4);
+  g.font = '500 1.8px "JetBrains Mono", Galmuri11'; g.fillText(`${t.side} · STEREO · 120µs EQ`, 4, 40.3);
   g.save(); g.beginPath(); g.rect(61, 34.2, 25, 6); g.clip(); g.fillStyle = INK; g.strokeStyle = INK;
   if (t.pattern === 'hatch'){ g.lineWidth = .7; for (let x = 55; x < 92; x += 1.8){ g.beginPath(); g.moveTo(x, 41); g.lineTo(x + 7, 33); g.stroke(); } }
   if (t.pattern === 'dots'){ for (let y = 35; y < 41; y += 1.5) for (let x = 61.8; x < 87; x += 1.5){ g.beginPath(); g.arc(x + ((y*2|0)%2)*.75, y, .48, 0, 7); g.fill(); } }
@@ -1060,7 +1082,7 @@ const BTN_ACTS = ['play','stop','eject','list'];
 function stripTexture(){
   const { c, g } = makeCanvas(132, 7, 12);
   g.fillStyle = PAPER; g.fillRect(0, 0, 132, 7);
-  g.fillStyle = INK; g.font = '800 3px "JetBrains Mono"'; g.textBaseline = 'middle';
+  g.fillStyle = INK; g.font = '800 3px "JetBrains Mono", Galmuri11'; g.textBaseline = 'middle';
   g.fillText('UNIT 01', 5, 3.6);
   g.textAlign = 'right'; g.fillText('HT-DECK / STEREO', 132, 3.6);
   g.textAlign = 'left';
@@ -1072,8 +1094,8 @@ function floorTexture(){
   g.fillStyle = POCKET; g.fillRect(0, 0, POCK.w, POCK.h);
   g.strokeStyle = INK; g.lineWidth = .35; g.setLineDash([1.6, 1.2]); rr(g, 6, 6, POCK.w - 12, POCK.h - 12, 3); g.stroke(); g.setLineDash([]);
   g.fillStyle = INK; g.textAlign = 'center';
-  g.font = '800 4.4px "JetBrains Mono"'; g.fillText('INSERT TAPE', POCK.w/2, 32);
-  g.font = '400 3.2px "IBM Plex Sans KR"'; g.fillText('테이프를 넣으세요', POCK.w/2, 38.5);
+  g.font = '800 4.4px "JetBrains Mono", Galmuri11'; g.fillText('INSERT TAPE', POCK.w/2, 32);
+  g.font = '400 3.2px Galmuri11'; g.fillText('테이프를 넣으세요', POCK.w/2, 38.5);
   g.save(); g.translate(POCK.w/2, 46); g.beginPath(); g.moveTo(-1.6,-3); g.lineTo(1.6,-3); g.lineTo(1.6,1); g.lineTo(4,1); g.lineTo(0,5); g.lineTo(-4,1); g.lineTo(-1.6,1); g.closePath(); g.fill(); g.restore();
   return toTex(c);
 }
@@ -1082,7 +1104,7 @@ function buttonTexture(act, on){
   const bg = on ? INK : PAPER, fg = on ? PAPER : INK;
   rr(g, .2, .2, 29.6, 17.6, 2.8); g.fillStyle = bg; g.fill();
   g.save(); g.translate(11.2, 2.6); g.scale(.42, .42); g.fillStyle = fg; g.fill(new Path2D(ICONS[act === 'play' && on ? 'pause' : act])); g.restore();
-  g.fillStyle = fg; g.font = '800 2.6px "JetBrains Mono"'; g.textAlign = 'center';
+  g.fillStyle = fg; g.font = '800 2.6px "JetBrains Mono", Galmuri11'; g.textAlign = 'center';
   g.fillText((act === 'play' && on ? 'PAUSE' : act.toUpperCase()).split('').join(' '), 15, 14.6);
   return toTex(c);
 }
@@ -1092,13 +1114,13 @@ function drawLCD(s){
   g.clearRect(0, 0, LCDU.w, LCDU.h);
   rr(g, 0, 0, LCDU.w, LCDU.h, 1.8); g.fillStyle = INK; g.fill();
   g.fillStyle = PAPER; g.textBaseline = 'alphabetic';
-  g.font = '800 2.4px "JetBrains Mono"'; g.fillText(s.state, 3, 5.2);
-  g.font = '500 6px "JetBrains Mono"'; g.textAlign = 'right'; g.fillText(s.time, 79, 7.4); g.textAlign = 'left';
-  g.font = '800 3.1px "JetBrains Mono"'; g.fillText(s.title, 3, 12.2, 76);
-  g.font = '500 2.3px "JetBrains Mono"'; g.fillText(s.sub, 3, 15.6, 76);
+  g.font = '800 2.4px "JetBrains Mono", Galmuri11'; g.fillText(s.state, 3, 5.2);
+  g.font = '500 6px "JetBrains Mono", Galmuri11'; g.textAlign = 'right'; g.fillText(s.time, 79, 7.4); g.textAlign = 'left';
+  g.font = '800 3.1px "JetBrains Mono", Galmuri11'; g.fillText(s.title, 3, 12.2, 76);
+  g.font = '500 2.3px "JetBrains Mono", Galmuri11'; g.fillText(s.sub, 3, 15.6, 76);
   for (let x = 3; x < 79; x += 1.2) g.fillRect(x, 17.9, .25, .25);
   g.fillRect(3, 17.55, 76 * s.prog, .95);
-  g.font = '800 1.6px "JetBrains Mono"';
+  g.font = '800 1.6px "JetBrains Mono", Galmuri11';
   [s.vuL, s.vuR].forEach((n, r) => {
     const y = 20 + r * 2;
     g.fillText(r ? 'R' : 'L', 3, y + 1.15);
@@ -1137,7 +1159,7 @@ function buildDeck(){
   const gripGeo = new THREE.BoxGeometry(18, 2.6, 1.8); const grip = new THREE.Mesh(gripGeo, htMat({ base:.9 }));
   grip.position.set(0, 65.5, 3.3); pivot.add(grip); const ge = edges(gripGeo); ge.position.copy(grip.position); pivot.add(ge);
   const doorTxt = new THREE.Mesh(new THREE.PlaneGeometry(40, 3), htMat({ map: (() => {
-    const { c, g:x } = makeCanvas(40, 3, 14); x.fillStyle = PAPER; x.fillRect(0,0,40,3); x.fillStyle = INK; x.font = '800 2px "JetBrains Mono"'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('◀ OPEN · HT-01 · AUTO REVERSE ▶', 20, 1.6); return toTex(c);
+    const { c, g:x } = makeCanvas(40, 3, 14); x.fillStyle = PAPER; x.fillRect(0,0,40,3); x.fillStyle = INK; x.font = '800 2px "JetBrains Mono", Galmuri11'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('◀ OPEN · HT-01 · AUTO REVERSE ▶', 20, 1.6); return toTex(c);
   })(), flat:1 }));
   doorTxt.position.set(0, 10, 2.45); pivot.add(doorTxt);
   [-40, 40].forEach(x => { const hg = new THREE.CylinderGeometry(1.4, 1.4, 12, 14); hg.rotateZ(Math.PI/2); const h = new THREE.Mesh(hg, htMat({ base:.85 })); h.position.set(x, 0, .4); pivot.add(h); const he = edges(hg, 30); he.position.copy(h.position); pivot.add(he); });
@@ -1777,14 +1799,15 @@ function tick(now){
 async function boot(){
   try {
     await Promise.race([
-      Promise.all([document.fonts.load('900 40px Unbounded'), document.fonts.load('800 20px "JetBrains Mono"'),
-                   document.fonts.load('500 20px "JetBrains Mono"'), document.fonts.load('400 20px "IBM Plex Sans KR"')]),
+      Promise.all([document.fonts.load('900 40px Unbounded'), document.fonts.load('800 20px "JetBrains Mono", Galmuri11'),
+                   document.fonts.load('500 20px "JetBrains Mono", Galmuri11'), document.fonts.load('400 20px Galmuri11', '가あ漢')]),
       new Promise(r => setTimeout(r, 2500)),
     ]);
   } catch(e){}
   measure();
   deck = buildDeck();
   const hubTex = hubTexture();
+  TAPES.forEach(t => (t.list || []).forEach(x => Lyrics.get(x)));         // 가사 미리 받아 두기 (곡 전환 시 즉시 표시)
   tapes = TAPES.map((t, i) => {
     const built = buildCassette(t, i, hubTex);
     const a = L.anchors[i] || { x:0, y:0 };
